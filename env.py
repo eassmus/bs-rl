@@ -15,10 +15,10 @@ class Agent:
     def __init__(self, hand, my_index, num_players):
         raise NotImplementedError
 
-    def get_card(self, intended_card):
+    def get_card(self, intended_card) -> tuple[str, int]:
         raise NotImplementedError
     
-    def get_call_bs(self, player_index, card, card_amt):
+    def get_call_bs(self, player_index, card, card_amt) -> bool:
         raise NotImplementedError
 
     def give_info(self, player_indexes_picked_up):
@@ -48,13 +48,12 @@ class BSEnv:
             card, card_amt = self.players[self.turn].get_card(cards[self.total_turns % 13]) # TODO: figure out what info to pass in
             self.player_hands[self.turn][card] -= card_amt
             [self.pile.append(card) for _ in range(card_amt)]
-            is_bs = cards[self.total_turns % 31] == card
+            is_bs = cards[self.total_turns % 13] == card
             bids = []
             for other_player in range(self.turn + 1, self.turn + self.num_players):
                 player_index = other_player % 4
                 bs_bid = self.players[player_index].get_call_bs(player_index, card, card_amt)
                 bids.append(bs_bid)
-
             if True in bids:
                 if is_bs:
                     for card in self.pile:
@@ -75,3 +74,12 @@ class BSEnv:
             self.turn += 1
             self.turn %= self.num_players
             self.total_turns += 1
+            for player_index in range(self.num_players):
+                empty = True
+                for card in cards:
+                    if self.player_hands[player_index][card] > 0:
+                        empty = False
+                        break
+                if empty:
+                    self.finished = True
+                    break
