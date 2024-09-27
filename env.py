@@ -1,5 +1,6 @@
 from copy import deepcopy
 import random
+import game_metrics as gm
 # random.seed(42)
 
 # Player Methods
@@ -88,19 +89,15 @@ class BSEnv:
 
     def run_game(self):
         while not self.finished:
-            print("-----------")
-            print(f"Turn: {self.total_turns} Card to Play: {cards[self.total_turns % 13]}")
-            print(f"Pile {self.pile}")
+            starting_hands = deepcopy(self.player_hands)
+            starting_pile = deepcopy(self.pile)
 
             # get card
-            card, card_amt = self.players[self.turn].get_card(cards[self.total_turns % 13], self.player_hands[self.turn]) # TODO: figure out what info to pass in
-            print(f"Player {self.turn} current hand {self.player_hands[self.turn]}")
+            card, card_amt = self.players[self.turn].get_card(cards[self.total_turns % 13], self.player_hands[self.turn])
 
             # remove cards from hand
             self.player_hands[self.turn] = remove_cards(self.player_hands[self.turn], card, card_amt)
-            print(f"Player {self.turn} plays {card} {card_amt} time(s).")
-            print(f"Player {self.turn} new hand {self.player_hands[self.turn]}")
-
+            
             # add card to pile
             [self.pile.append(card) for _ in range(card_amt)]
 
@@ -114,16 +111,14 @@ class BSEnv:
 
                 bs_bid = self.players[player_index].get_call_bs(player_index, card, card_amt, self.player_hands[player_index])
                 if bs_bid:
-                    print(f"Player {player_index} bids BS")
                     bids[player_index] = True
 
             if True in bids:
                 if is_bs:
                     # add pile to player hand
-                    for card in self.pile:
+                    while len(self.pile) > 0:
                         self.player_hands[self.turn].append(self.pile.pop())
 
-                    print(f"Player {self.turn} takes the pile. Their new hand is {self.player_hands[self.turn]}")
                     for player_index in range(self.num_players):
                         self.players[player_index].give_info([self.turn])
 
@@ -131,20 +126,18 @@ class BSEnv:
                     for card in self.pile:
                         # split evenly among players who bid true
                         loser_indexes = [other_player for other_player in range(self.num_players) if bids[other_player] == True]
-                        print(f"It was not BS. Splitting the pile {self.pile}")
-                        [print(f"Player {loser_index} old hand: {self.player_hands[loser_index]}") for loser_index in loser_indexes]
-
+                        
                         pile_size = len(self.pile)
                         for i in range(pile_size):
                             if len(self.pile) == 0:
                                 break
                             self.player_hands[loser_indexes[i % len(loser_indexes)]].append(self.pile.pop())
 
-                        [print(f"Player {loser_index} new hand: {self.player_hands[loser_index]}") for loser_index in loser_indexes]
-
-
                     for player_index in range(self.num_players):
                         self.players[player_index].give_info(loser_indexes)
+
+            self.action_history.append(gm.RoundPlayed(self.turn, self.total_turns, card, card_amt, [i for i in range(self.num_players) if bids[i]], is_bs, starting_hands, deepcopy(self.player_hands), starting_pile, deepcopy(self.pile)))
+
 
             self.turn += 1
             self.turn %= self.num_players
@@ -158,3 +151,5 @@ class BSEnv:
 
             # sanity check to make sure no cards are being duplicated/deleted
             self.sanity_check()
+        
+        return gm.GameMetrics(self.action_history, self.num_players, self.decks, self.turn - 1)

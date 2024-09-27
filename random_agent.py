@@ -16,4 +16,6 @@ class RandomAgent(env.Agent):
 
 
 env = env.BSEnv(agent_types = [RandomAgent, RandomAgent, RandomAgent, RandomAgent])
-env.run_game()
+game_results = env.run_game()
+[print(a) for a in game_results.rounds]
+print(len(game_results.rounds))
