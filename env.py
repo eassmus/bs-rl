@@ -1,5 +1,5 @@
 from copy import deepcopy
-
+import random
 # Player Methods
 # get_call_bs
 # get_card
@@ -25,9 +25,10 @@ class Agent:
         raise NotImplementedError
 
 class BSEnv:
-    def __init__(self, agents : [Agent], decks=1):
-        self.num_players = len(agents)
-        self.players = agents
+    def __init__(self, agent_types : [Agent], decks=1):
+        self.num_players = len(agent_types)
+        self.agent_types = agent_types
+        self.players = []
         self.decks = decks
         self.reset()
 
@@ -38,9 +39,15 @@ class BSEnv:
         self.pile = []
         self.action_history = []
         deck = deepcopy(cards) * self.decks
-        deck.shuffle()
+        random.shuffle(deck)
         cards_per_player = (52 * self.decks) // self.num_players
         self.player_hands = [deck[i:i+cards_per_player] for i in range(0, len(deck), cards_per_player)]
+
+        self.players = []
+        for i, agent_type in enumerate(self.agent_types):
+            # initialize players
+            self.players.append(agent_type(self.player_hands[i], i, self.num_players))
+
 
     def run_game(self):
         while not self.finished:
