@@ -15,10 +15,10 @@ class Agent:
     def get_card(self):
         raise NotImplementedError
     
-    def get_card_amt(self):
+    def get_call_bs(self, player_index, card, card_amt):
         raise NotImplementedError
-    
-    def get_call_bs(self):
+
+    def give_info(self, player_indexes_picked_up):
         raise NotImplementedError
 
 class BSEnv:
@@ -42,18 +42,18 @@ class BSEnv:
     def run_game(self):
         while not self.finished:
             # get card
-            card = self.players[self.turn].get_card() # TODO: figure out what info to pass in
-            card_amt = self.players[self.turn].get_card_amt() #player checks it is legal for now
+            card, card_amt = self.players[self.turn].get_card() # TODO: figure out what info to pass in
             self.player_hands[self.turn][card] -= card_amt
             [self.pile.append(card) for _ in range(card_amt)]
             is_bs = cards[self.total_turns % 31] == card
             bids = []
             for other_player in range(self.turn + 1, self.turn + self.num_players):
                 player_index = other_player % 4
-                bs_bid = self.players[player_index].get_call_bs()
+                bs_bid = self.players[player_index].get_call_bs(player_index, card, card_amt)
                 bids.append(bs_bid)
 
-            
+            if True in bids:
+
             
             self.turn += 1
             self.turn %= self.num_players
