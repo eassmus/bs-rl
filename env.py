@@ -29,17 +29,25 @@ def remove_cards(card_list, card, num):
 
 
 class Agent:
-    def __init__(self, hand, my_index, num_players):
+    def __init__(self, my_index, num_players):
         raise NotImplementedError
 
-    def get_card(self, intended_card) -> tuple[str, int]:
+    def get_card(self, intended_card, hand) -> tuple[str, int]:
         raise NotImplementedError
 
-    def get_call_bs(self, player_index, card, card_amt) -> bool:
+    def get_call_bs(self, player_index, card, card_amt, hand) -> bool:
         raise NotImplementedError
 
     def give_info(self, player_indexes_picked_up):
         raise NotImplementedError
+
+class BSEnv:
+    def __init__(self, agent_types : [Agent], decks=1):
+        self.num_players = len(agent_types)
+        self.agent_types = agent_types
+        self.players = []
+        self.decks = decks
+        self.reset()
 
 class BSEnv:
     def __init__(self, agent_types : [Agent], decks=1):
