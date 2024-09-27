@@ -11,6 +11,35 @@ import random
 
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"] * 4
 
+def card_to_index(card):
+    match card:
+        case "A":
+            return 0
+        case "2":
+            return 1
+        case "3":
+            return 2
+        case "4":
+            return 3
+        case "5":
+            return 4
+        case "6":
+            return 5
+        case "7":
+            return 6
+        case "8":
+            return 7
+        case "9":
+            return 8
+        case "10":
+            return 9
+        case "J":
+            return 10
+        case "Q":
+            return 11
+        case "K":
+            return 12
+
 class Agent:
     def __init__(self, hand, my_index, num_players):
         raise NotImplementedError
@@ -53,7 +82,7 @@ class BSEnv:
         while not self.finished:
             # get card
             card, card_amt = self.players[self.turn].get_card(cards[self.total_turns % 13]) # TODO: figure out what info to pass in
-            self.player_hands[self.turn][card] -= card_amt
+            self.player_hands[self.turn][card_to_index(card)] -= card_amt
             [self.pile.append(card) for _ in range(card_amt)]
             is_bs = cards[self.total_turns % 13] == card
             bids = []
@@ -64,7 +93,7 @@ class BSEnv:
             if True in bids:
                 if is_bs:
                     for card in self.pile:
-                        self.player_hands[self.turn][card] += 1
+                        self.player_hands[self.turn][card_to_index(card)] += 1
                     for player_index in range(self.num_players):
                         self.players[player_index].give_info([self.turn])
                 else:
@@ -84,7 +113,7 @@ class BSEnv:
             for player_index in range(self.num_players):
                 empty = True
                 for card in cards:
-                    if self.player_hands[player_index][card] > 0:
+                    if self.player_hands[player_index][card_to_index(card)] > 0:
                         empty = False
                         break
                 if empty:
