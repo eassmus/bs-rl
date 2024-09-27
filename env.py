@@ -60,7 +60,7 @@ class BSEnv:
 
     def sanity_check(self):
         try:
-            assert len(self.player_hands[0]) + len(self.player_hands[1]) + len(self.player_hands[2]) + len(self.player_hands[3]) + len(self.pile) == 52
+            assert sum([len(self.player_hands[i]) for i in range(self.num_players)]) + len(self.pile) == 52 * self.decks
         except AssertionError:
             print("Assertion failed: Total number of cards does not equal 52.")
             print("Player Hands:")
@@ -105,7 +105,7 @@ class BSEnv:
             is_bs = cards[self.total_turns % 13] != card
 
             # collect bs bids from other players
-            bids = [False]*4
+            bids = [False]*self.num_players
             for other_player in range(self.turn + 1, self.turn + self.num_players):
                 player_index = other_player % 4
 
