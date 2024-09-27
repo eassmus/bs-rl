@@ -12,7 +12,10 @@ from copy import deepcopy
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"] * 4
 
 class Agent:
-    def get_card(self):
+    def __init__(self, hand, my_index, num_players):
+        raise NotImplementedError
+
+    def get_card(self, intended_card):
         raise NotImplementedError
     
     def get_call_bs(self, player_index, card, card_amt):
@@ -42,7 +45,7 @@ class BSEnv:
     def run_game(self):
         while not self.finished:
             # get card
-            card, card_amt = self.players[self.turn].get_card() # TODO: figure out what info to pass in
+            card, card_amt = self.players[self.turn].get_card(cards[self.total_turns % 13]) # TODO: figure out what info to pass in
             self.player_hands[self.turn][card] -= card_amt
             [self.pile.append(card) for _ in range(card_amt)]
             is_bs = cards[self.total_turns % 31] == card
@@ -53,8 +56,22 @@ class BSEnv:
                 bids.append(bs_bid)
 
             if True in bids:
-
-            
+                if is_bs:
+                    for card in self.pile:
+                        self.player_hands[self.turn][card] += 1
+                    for player_index in range(self.num_players):
+                        self.players[player_index].give_info([self.turn])
+                else:
+                    for card in self.pile:
+                        #split evenly among players who bid true
+                        loser_indexes = [other_player for other_player in range(self.num_players) if bids[other_player] == True]
+                        pile_size = len(self.pile)
+                        for i in range(pile_size):
+                            if len(self.pile) == 0:
+                                break
+                            loser_indexes[i % len(loser_indexes)].append(self.pile.pop())
+                    for player_index in range(self.num_players):
+                        self.players[player_index].give_info(loser_indexes)  
             self.turn += 1
             self.turn %= self.num_players
             self.total_turns += 1
