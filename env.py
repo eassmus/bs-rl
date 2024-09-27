@@ -16,6 +16,11 @@ cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"] * 4
 
 def remove_cards(card_list, card, num):
     """Remove num cards from a card list."""
+    card_count = card_list.count(card)
+
+    if card_count == 0 or num > card_count:
+        raise ValueError(f"Agent Invalid Action: cards played do not exist in hand")
+
     count = 0
     new_card_list = []
 
@@ -67,7 +72,6 @@ class BSEnv:
             for i, hand in enumerate(self.player_hands):
                 print(f"Player {i + 1}: {hand}")
             print("Pile:", self.pile)
-            print(len(self.player_hands[0]) + len(self.player_hands[1]) + len(self.player_hands[2]) + len(self.player_hands[3]) + len(self.pile))
             raise AssertionError("Total card count does not equal 52.")
 
     def reset(self):
@@ -107,9 +111,9 @@ class BSEnv:
             # collect bs bids from other players
             bids = [False]*self.num_players
             for other_player in range(self.turn + 1, self.turn + self.num_players):
-                player_index = other_player % 4
+                player_index = other_player % self.num_players
 
-                bs_bid = self.players[player_index].get_call_bs(player_index, card, card_amt, self.player_hands[player_index])
+                bs_bid = self.players[player_index].get_call_bs(player_index, cards[self.total_turns % 13], card_amt, self.player_hands[player_index])
                 if bs_bid:
                     bids[player_index] = True
 
