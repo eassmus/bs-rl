@@ -13,9 +13,3 @@ class RandomAgent(env.Agent):
 
     def give_info(self, player_indexes_picked_up):
         pass
-
-
-env = env.BSEnv(agent_types = [RandomAgent, RandomAgent, RandomAgent, RandomAgent])
-game_results = env.run_game()
-[print(a) for a in game_results.rounds]
-print(len(game_results.rounds))
