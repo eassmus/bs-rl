@@ -48,19 +48,12 @@ class Agent:
         raise NotImplementedError
 
 class BSEnv:
-    def __init__(self, agent_types : [Agent], decks=1):
+    def __init__(self, agent_types : [Agent], agent_args = [], decks=1):
         self.num_players = len(agent_types)
         self.agent_types = agent_types
         self.players = []
         self.decks = decks
-        self.reset()
-
-class BSEnv:
-    def __init__(self, agent_types : [Agent], decks=1):
-        self.num_players = len(agent_types)
-        self.agent_types = agent_types
-        self.players = []
-        self.decks = decks
+        self.agent_args = agent_args
         self.reset()
 
     def sanity_check(self):
@@ -88,7 +81,10 @@ class BSEnv:
         self.players = []
         for i, agent_type in enumerate(self.agent_types):
             # initialize players
-            self.players.append(agent_type(i, self.num_players))
+            if len(self.agent_args) > 0 and len(self.agent_args[i]) > 0:
+                self.players.append(agent_type(i, self.num_players, self.agent_args[i]))
+            else:
+                self.players.append(agent_type(i, self.num_players))
 
 
     def run_game(self):
