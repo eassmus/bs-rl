@@ -1,6 +1,7 @@
 from copy import deepcopy
 import random
 import game_metrics as gm
+from collections import defaultdict
 # random.seed(42)
 
 # Player Methods
@@ -16,26 +17,19 @@ cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"] * 4
 
 def remove_cards(card_list, card, num):
     """Remove num cards from a card list."""
-    card_count = card_list.count(card)
+    card_count = card_list[card]
 
     if card_count == 0 or num > card_count:
         raise ValueError(f"Agent Invalid Action: cards played do not exist in hand")
 
-    count = 0
-    new_card_list = []
+    card_list[card] -= num
 
-    for item in card_list:
-        if item == card and count < num:
-            count += 1
-        else:
-            new_card_list.append(item)
-
-    return new_card_list
+    return card_list
 
 
 
 class Agent:
-    def __init__(self, my_index, num_players):
+    def __init__(self, my_index, num_players, agent_args = []):
         raise NotImplementedError
 
     def get_card(self, intended_card, hand) -> tuple[str, int]:
@@ -46,6 +40,9 @@ class Agent:
 
     def give_info(self, player_indexes_picked_up):
         raise NotImplementedError
+    
+    def reset(self):
+        raise NotImplementedError
 
 class BSEnv:
     def __init__(self, agent_types : [Agent], agent_args = [], decks=1):
@@ -53,12 +50,18 @@ class BSEnv:
         self.agent_types = agent_types
         self.players = []
         self.decks = decks
-        self.agent_args = agent_args
+        self.players = []
+        for i, agent_type in enumerate(self.agent_types):
+            # initialize players
+            if len(agent_args) > 0 and len(agent_args[i]) > 0:
+                self.players.append(agent_type(i, self.num_players, agent_args[i]))
+            else:
+                self.players.append(agent_type(i, self.num_players))
         self.reset()
 
     def sanity_check(self):
         try:
-            assert sum([len(self.player_hands[i]) for i in range(self.num_players)]) + len(self.pile) == 52 * self.decks
+            assert sum([sum(self.player_hands[i].values()) for i in range(self.num_players)]) + len(self.pile) == 52 * self.decks
         except AssertionError:
             print("Assertion failed: Total number of cards does not equal 52.")
             print("Player Hands:")
@@ -76,15 +79,12 @@ class BSEnv:
         deck = deepcopy(cards) * self.decks
         random.shuffle(deck)
         cards_per_player = (52 * self.decks) // self.num_players
-        self.player_hands = [deck[i:i+cards_per_player] for i in range(0, len(deck), cards_per_player)]
+        self.player_hands = [defaultdict(int) for _ in range(0, len(self.agent_types))]
+        for i in range(len(deck)): 
+            self.player_hands[i // cards_per_player][deck[i]] += 1
 
-        self.players = []
-        for i, agent_type in enumerate(self.agent_types):
-            # initialize players
-            if len(self.agent_args) > 0 and len(self.agent_args[i]) > 0:
-                self.players.append(agent_type(i, self.num_players, self.agent_args[i]))
-            else:
-                self.players.append(agent_type(i, self.num_players))
+        for player in self.players:
+            player.reset()
 
 
     def run_game(self):
@@ -117,7 +117,7 @@ class BSEnv:
                 if is_bs:
                     # add pile to player hand
                     while len(self.pile) > 0:
-                        self.player_hands[self.turn].append(self.pile.pop())
+                        self.player_hands[self.turn][self.pile.pop()] += 1
 
                     for player_index in range(self.num_players):
                         self.players[player_index].give_info([self.turn])
@@ -131,7 +131,7 @@ class BSEnv:
                         for i in range(pile_size):
                             if len(self.pile) == 0:
                                 break
-                            self.player_hands[loser_indexes[i % len(loser_indexes)]].append(self.pile.pop())
+                            self.player_hands[loser_indexes[i % len(loser_indexes)]][self.pile.pop()] += 1
 
                     for player_index in range(self.num_players):
                         self.players[player_index].give_info(loser_indexes)
@@ -145,7 +145,7 @@ class BSEnv:
 
             # check if player hand is empty
             for player_hand in self.player_hands:
-                if len(player_hand) == 0:
+                if sum([player_hand[card] for card in player_hand]) == 0:
                     # end game
                     self.finished = True
 

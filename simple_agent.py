@@ -3,16 +3,12 @@ from env import Agent
 import random
 
 class SimpleAgent(Agent):
-    def __init__(self, my_index, num_players):
+    def __init__(self, my_index, num_players, agent_args = []):
         self.num_players= num_players
 
 
     def get_card_count(self, target_card, hand):
-        num_target_card = 0
-        for card in hand:
-            if card == target_card:
-                num_target_card+=1
-        return num_target_card
+        return hand[target_card]
 
     def get_card(self, intended_card, hand):
         # check if has card and if so, plays it
@@ -20,7 +16,7 @@ class SimpleAgent(Agent):
         if card_count > 0:
             return intended_card, card_count
         # play a random card if not
-        return hand[0], 1
+        return [card for card in hand if hand[card] > 0][0], 1
 
     def get_call_bs(self, player_index, card, card_amt, hand):
         # calls BS if knows it is BS
@@ -34,4 +30,7 @@ class SimpleAgent(Agent):
         return False
 
     def give_info(self, player_indexes_picked_up):
+        pass
+
+    def reset(self):
         pass
