@@ -123,7 +123,7 @@ class BSEnv:
                         self.players[player_index].give_info([self.turn])
 
                 else:
-                    for card in self.pile:
+                    for card_pile in self.pile:
                         # split evenly among players who bid true
                         loser_indexes = [other_player for other_player in range(self.num_players) if bids[other_player] == True]
                         
