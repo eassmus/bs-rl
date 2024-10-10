@@ -6,6 +6,11 @@ from random import random as rand
 from torch import tensor
 from torch import float32
 
+"""
+Very big work in progress, not really sure what to do with it yet.
+"""
+
+
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 
 class _Model(nn.Module):
