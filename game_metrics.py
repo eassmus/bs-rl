@@ -38,3 +38,10 @@ class GameMetrics:
         self.rounds = rounds
         self.decks = decks
         self.winner = winner
+
+    def get_text(self):
+        out = ""
+        for round in self.rounds:
+            out += round.__str__()
+            out += "\n\n"
+        return out

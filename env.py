@@ -2,6 +2,7 @@ from copy import deepcopy
 import random
 import game_metrics as gm
 from collections import defaultdict
+from agents.agent import Agent
 # random.seed(42)
 
 # Player Methods
@@ -26,26 +27,8 @@ def remove_cards(card_list, card, num):
 
     return card_list
 
-
-
-class Agent:
-    def __init__(self, my_index, num_players, agent_args = []):
-        raise NotImplementedError
-
-    def get_card(self, intended_card, hand) -> tuple[str, int]:
-        raise NotImplementedError
-
-    def get_call_bs(self, player_index, card, card_amt, hand) -> bool:
-        raise NotImplementedError
-
-    def give_info(self, player_indexes_picked_up):
-        raise NotImplementedError
-    
-    def reset(self):
-        raise NotImplementedError
-
 class BSEnv:
-    def __init__(self, agent_types : [Agent], agent_args = [], decks=1):
+    def __init__(self, agent_types : list[Agent], agent_args = [], decks=1):
         self.num_players = len(agent_types)
         self.agent_types = agent_types
         self.players = []
@@ -88,6 +71,7 @@ class BSEnv:
 
    
     def run_game(self):
+        self.reset()
         while not self.finished:
             starting_hands = deepcopy(self.player_hands)
             starting_pile = deepcopy(self.pile)
@@ -109,8 +93,7 @@ class BSEnv:
             bids = [False]*self.num_players
             for other_player in range(self.turn + 1, self.turn + self.num_players):
                 player_index = other_player % self.num_players
-
-                bs_bid = self.players[player_index].get_call_bs(player_index, cards[self.total_turns % 13], card_amt, self.player_hands[player_index])
+                bs_bid = self.players[player_index].get_call_bs(self.turn, cards[self.total_turns % 13], card_amt, self.player_hands[player_index])
                 if bs_bid:
                     bids[player_index] = True
 
@@ -124,7 +107,7 @@ class BSEnv:
                         self.players[player_index].give_info([self.turn])
 
                 else:
-                    for card in self.pile:
+                    for card_pile in self.pile:
                         # split evenly among players who bid true
                         loser_indexes = [other_player for other_player in range(self.num_players) if bids[other_player] == True]
                         

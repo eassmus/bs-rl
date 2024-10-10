@@ -1,5 +1,4 @@
-from env import BSEnv
-from env import Agent
+from agents.agent import Agent
 import random
 
 class SimpleAgent(Agent):
