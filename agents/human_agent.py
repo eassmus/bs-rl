@@ -1,8 +1,8 @@
-import env
+from agents.agent import Agent
 
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 
-class HumanAgent(env.Agent):
+class HumanAgent(Agent):
     def __init__(self, my_index, num_players, agent_args = []):
         pass
 

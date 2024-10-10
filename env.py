@@ -2,6 +2,7 @@ from copy import deepcopy
 import random
 import game_metrics as gm
 from collections import defaultdict
+from agents.agent import Agent
 # random.seed(42)
 
 # Player Methods
@@ -26,26 +27,8 @@ def remove_cards(card_list, card, num):
 
     return card_list
 
-
-
-class Agent:
-    def __init__(self, my_index, num_players, agent_args = []):
-        raise NotImplementedError
-
-    def get_card(self, intended_card, hand) -> tuple[str, int]:
-        raise NotImplementedError
-
-    def get_call_bs(self, player_index, card, card_amt, hand) -> bool:
-        raise NotImplementedError
-
-    def give_info(self, player_indexes_picked_up):
-        raise NotImplementedError
-    
-    def reset(self):
-        raise NotImplementedError
-
 class BSEnv:
-    def __init__(self, agent_types : [Agent], agent_args = [], decks=1):
+    def __init__(self, agent_types : list[Agent], agent_args = [], decks=1):
         self.num_players = len(agent_types)
         self.agent_types = agent_types
         self.players = []

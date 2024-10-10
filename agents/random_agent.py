@@ -1,7 +1,7 @@
-import env
+from agents.agent import Agent
 import random
 
-class RandomAgent(env.Agent):
+class RandomAgent(Agent):
     def __init__(self, my_index, num_players, agent_args = []):
         if len(agent_args) > 0:
             self.random_chance = float(agent_args["random_chance"]) 

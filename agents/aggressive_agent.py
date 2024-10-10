@@ -1,7 +1,7 @@
-import env
+from agents.agent import Agent
 import random
 
-class AggressiveAgent(env.Agent):
+class AggressiveAgent(Agent):
     def __init__(self, my_index, num_players):
         pass 
 
