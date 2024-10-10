@@ -37,5 +37,8 @@ class HumanAgent(Agent):
     def give_info(self, player_indexes_picked_up):
         print("Player", player_indexes_picked_up, "picked up the pile")
     
+    def give_full_info(self, was_bs):
+        pass
+
     def reset(self):
         pass

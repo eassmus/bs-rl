@@ -1,9 +1,12 @@
 from agents.agent import Agent
+from env import BSEnv
 from torch import nn
 from torch import optim
 import numpy as np
 from random import random as rand
 from torch import tensor
+from copy import deepcopy
+import game_metrics as gm
 from torch import float32
 
 """
@@ -33,7 +36,7 @@ class BSCallLearningAgent(Agent):
         self.num_decks = agent_args["num_decks"]
         self.expected_values = None # generated later when we are given our first hand
         self.in_pile = []
-        self.model = _Model(6, 30, 2)
+        self.model = _Model(6, agent_args["hidden_layer_size"], 2)
         self.data = []
         self.hand_sizes = [self.num_decks * 13] * self.num_players
         self.last_caller = None
@@ -60,6 +63,7 @@ class BSCallLearningAgent(Agent):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        self.data = []
 
     def get_model(self):
         return self.model.state_dict()
@@ -95,12 +99,8 @@ class BSCallLearningAgent(Agent):
         self.hand_sizes[player_index] -= card_amt
         model_result = self.model.forward(tensor([d],dtype=float32))[0]
         call = model_result[1] > model_result[0]
-        if rand() < 0.1:
-            call = rand() < 0.5
         self.last_caller = player_index
         self.called = call
-        if call:
-            print("CALLING BS")
         return call
 
     def give_info(self, player_indexes_picked_up):
@@ -111,16 +111,13 @@ class BSCallLearningAgent(Agent):
         for player in player_indexes_picked_up:
             self.hand_sizes[player] += len(self.in_pile) / 3
 
+        self.in_pile = []
+
+    def give_full_info(self, was_bs):
         if len(self.data) > 0 and self.data[-1][0] == "label":
             return
         if len(self.data) == 0:
             return 
-
-        self.in_pile = []
-
-        was_bs = self.last_caller in player_indexes_picked_up
-
-        print(self.called)
 
         if self.called == was_bs:
             self.correct += 1
@@ -134,9 +131,7 @@ class BSCallLearningAgent(Agent):
         else:
             self.data.append(("label", 0))
         if (len(self.data) // 2) % 1000 == 0:
-            print("Training At: ", len(self.data) // 2)
             self.train()
-
 
     def reset(self):
         self.expected_values = None

@@ -16,5 +16,8 @@ class AggressiveAgent(Agent):
     def give_info(self, player_indexes_picked_up):
         pass
 
+    def give_full_info(self, was_bs):
+        pass
+    
     def reset(self):
         pass
