@@ -86,7 +86,7 @@ class BSEnv:
         for player in self.players:
             player.reset()
 
-
+   
     def run_game(self):
         while not self.finished:
             starting_hands = deepcopy(self.player_hands)
@@ -97,6 +97,7 @@ class BSEnv:
 
             # remove cards from hand
             self.player_hands[self.turn] = remove_cards(self.player_hands[self.turn], card, card_amt)
+
             
             # add card to pile
             [self.pile.append(card) for _ in range(card_amt)]
@@ -153,3 +154,5 @@ class BSEnv:
             self.sanity_check()
         
         return gm.GameMetrics(self.action_history, self.num_players, self.decks, self.turn - 1)
+
+
