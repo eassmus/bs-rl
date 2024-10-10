@@ -26,7 +26,7 @@ class _Model(nn.Module):
         out = self.fc2(out)
         return out
 
-class BSCallRLAgent(Agent):
+class BSCallLearningAgent(Agent):
     def __init__(self, my_index, num_players, agent_args):
         self.my_index = my_index
         self.num_players = num_players
