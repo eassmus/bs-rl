@@ -71,6 +71,7 @@ class BSEnv:
 
 
     def run_game(self):
+        self.reset()
         while not self.finished:
             starting_hands = deepcopy(self.player_hands)
             starting_pile = deepcopy(self.pile)
@@ -91,7 +92,6 @@ class BSEnv:
             bids = [False]*self.num_players
             for other_player in range(self.turn + 1, self.turn + self.num_players):
                 player_index = other_player % self.num_players
-
                 bs_bid = self.players[player_index].get_call_bs(self.turn, cards[self.total_turns % 13], card_amt, self.player_hands[player_index])
                 if bs_bid:
                     bids[player_index] = True

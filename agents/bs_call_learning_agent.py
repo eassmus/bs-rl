@@ -39,7 +39,6 @@ class BSCallLearningAgent(Agent):
         self.last_caller = None
         self.criterion = nn.CrossEntropyLoss()  # Loss function for classification tasks
         self.optimizer = optim.Adam(self.model.parameters(), lr=agent_args["learning_rate"])    
-        self.rounds_played = 0
         self.called = None
         self.correct = 0
         self.incorrect = 0
@@ -88,9 +87,9 @@ class BSCallLearningAgent(Agent):
     def get_call_bs(self, player_index, card, card_amt, hand):
         if len(self.data) > 0 and self.data[-1][0] == "data":
             self.data.pop()
-        self.update_expected_values(hand)
         if self.expected_values is None:
             self.gen_initial_expected_values(hand)
+        self.update_expected_values(hand)
         d = [self.expected_values[p][card] for p in range(self.num_players)] + [self.hand_sizes[player_index]] + [card_amt]
         self.data.append(("data", d))
         self.hand_sizes[player_index] -= card_amt
@@ -100,6 +99,8 @@ class BSCallLearningAgent(Agent):
             call = rand() < 0.5
         self.last_caller = player_index
         self.called = call
+        if call:
+            print("CALLING BS")
         return call
 
     def give_info(self, player_indexes_picked_up):
@@ -115,23 +116,27 @@ class BSCallLearningAgent(Agent):
         if len(self.data) == 0:
             return 
 
+        self.in_pile = []
+
         was_bs = self.last_caller in player_indexes_picked_up
+
+        print(self.called)
 
         if self.called == was_bs:
             self.correct += 1
         else:
             self.incorrect += 1
 
+        self.called = None
+
         if was_bs:
             self.data.append(("label", 1))
         else:
             self.data.append(("label", 0))
-        self.rounds_played += 1
-        if self.rounds_played % 100 == 0:
-            print("Training At: ", self.rounds_played)
+        if (len(self.data) // 2) % 1000 == 0:
+            print("Training At: ", len(self.data) // 2)
             self.train()
 
-        self.in_pile = []
 
     def reset(self):
         self.expected_values = None
