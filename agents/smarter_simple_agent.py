@@ -3,7 +3,7 @@ from agents.agent import Agent
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 
 # this agent tries to play what it won't have to play for a while 
-class SmartSimpleAngent:
+class SmartSimpleAgent:
     def __init__(self, my_index, num_players, agent_args = []):
         self.my_index = my_index
         self.num_players = num_players
