@@ -41,10 +41,10 @@ class BSCallLearningAgent(Agent):
         self.hand_sizes = [self.num_decks * 13] * self.num_players
         self.last_caller = None
         self.criterion = nn.CrossEntropyLoss()  # Loss function for classification tasks
-        self.optimizer = optim.Adam(self.model.parameters(), lr=agent_args["learning_rate"])    
-        self.called = None
-        self.correct = 0
-        self.incorrect = 0
+        self.optimizer = optim.Adam(self.model.parameters(), lr=agent_args["learning_rate"])
+        self.train_every = agent_args["train_every"]
+        if "load_model" in agent_args and agent_args["load_model"] is not None:
+            self.load_model(agent_args["load_model"])
 
     def gen_initial_expected_values(self, hand):
         self.expected_values = [{card : 0 for card in cards} for _ in range(self.num_players)]
@@ -100,7 +100,6 @@ class BSCallLearningAgent(Agent):
         model_result = self.model.forward(tensor([d],dtype=float32))[0]
         call = model_result[1] > model_result[0]
         self.last_caller = player_index
-        self.called = call
         return call
 
     def give_info(self, player_indexes_picked_up):
@@ -119,18 +118,11 @@ class BSCallLearningAgent(Agent):
         if len(self.data) == 0:
             return 
 
-        if self.called == was_bs:
-            self.correct += 1
-        else:
-            self.incorrect += 1
-
-        self.called = None
-
         if was_bs:
             self.data.append(("label", 1))
         else:
             self.data.append(("label", 0))
-        if (len(self.data) // 2) % 1000 == 0:
+        if (len(self.data) // 2) % self.train_every == 0:
             self.train()
 
     def reset(self):

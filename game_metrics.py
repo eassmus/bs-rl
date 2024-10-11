@@ -43,7 +43,7 @@ class GameMetrics:
         correct = 0
         incorrect = 0
         for round in self.rounds:
-            if player_index in round.bs_calls == round.was_bs:
+            if (player_index in round.bs_calls) == round.was_bs:
                 correct += 1
             else:
                 incorrect += 1
