@@ -128,4 +128,4 @@ def matchmake(agent_types, num_agents_per_type = 9, num_iterations = 500, matche
 
 # example
 if __name__ == "__main__":
-    matchmake([SimpleAgent, SmartSimpleAgent, AggressiveAgent, RandomAgent])
+    matchmake([SimpleAgent, SmartSimpleAgent, AggressiveAgent, RandomAgent],agent_args=[{}, {}, {}, {}])
