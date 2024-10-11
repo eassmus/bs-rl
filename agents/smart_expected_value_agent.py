@@ -8,7 +8,20 @@ class SmartExpectedValueAngent:
         self.my_index = my_index
         self.num_players = num_players
         self.expected_values = None # generated later when we are given our first hand
+        self.num_decks = agent_args["num_decks"]
+        self.hand_sizes = [(52 * self.num_decks) // self.num_players] * self.num_players
  
+    def gen_initial_expected_values(self, hand):
+        self.expected_values = [{card : 0 for card in cards} for _ in range(self.num_players)]
+        cards_left = {card: 4 * self.num_decks for card in cards}
+        for card in hand:
+            cards_left[card] -= 1
+            self.expected_values[self.my_index][card] += 1
+
+        for i in range(self.num_players):
+            if i != self.my_index:
+                self.expected_values[i] = {card : cards_left[card] / (self.num_players - 1) for card in cards}
+
     def update_expected_values(self, hand):
         for card in cards:
             self.expected_values[self.my_index][card] = hand[card]
@@ -27,8 +40,6 @@ class SmartExpectedValueAngent:
         return random_chosen, hand[random_chosen]
 
     def get_call_bs(self, player_index, card, card_amt, hand):
-        if len(self.data) > 0 and self.data[-1][0] == "data":
-            self.data.pop()
         if self.expected_values is None:
             self.gen_initial_expected_values(hand)
         self.update_expected_values(hand) 

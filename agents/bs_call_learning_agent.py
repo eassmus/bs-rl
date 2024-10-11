@@ -38,7 +38,7 @@ class BSCallLearningAgent(Agent):
         self.in_pile = []
         self.model = _Model(7, agent_args["hidden_layer_size"], 2)
         self.data = []
-        self.hand_sizes = [self.num_decks * 13] * self.num_players
+        self.hand_sizes = [(52 * self.num_decks) // self.num_players] * self.num_players
         self.last_caller = None
         self.criterion = nn.CrossEntropyLoss()  # Loss function for classification tasks
         self.optimizer = optim.Adam(self.model.parameters(), lr=agent_args["learning_rate"])
