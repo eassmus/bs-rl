@@ -424,10 +424,11 @@ class PPOAgent():
 
         if self.state == None:
             # this is the beginning of the game so no reward
+            self.previous_hand_size = len(hand)
             return state, 0
 
-        # reward based on previous hand size
-        reward = len(hand) - len(self.previous_hand_size)
+        # reward based on a reduction of previous hand size
+        reward = len(self.previous_hand_size) - len(hand)
         self.previous_hand_size = len(hand)
 
         return state, reward
