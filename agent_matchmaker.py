@@ -113,13 +113,11 @@ class MatchMaker:
             groups = self.form_groups()
             self.run_matches(groups, matches=matches_per_group)
 
-def matchmake(agent_types, agent_args = None):
-    random.seed(0)
-    num_agents_per_type = 8
+def matchmake(agent_types, num_agents_per_type = 9, num_iterations = 500, matches_per_group = 3, agent_args = None, seed = None):
+    if seed is not None:
+        random.seed(seed)
     matchmaker = MatchMaker(agent_types,num_agents_per_type = num_agents_per_type, agent_args=agent_args)
 
-    num_iterations = 500
-    matches_per_group = 3
     matchmaker.simulate(num_iterations,matches_per_group)
     results = matchmaker.report_results()
 

@@ -9,6 +9,7 @@ class SmartExpectedValueAngent:
         self.num_players = num_players
         self.expected_values = None # generated later when we are given our first hand
         self.num_decks = agent_args["num_decks"]
+        self.threshold = agent_args["threshold"]
         self.hand_sizes = [(52 * self.num_decks) // self.num_players] * self.num_players
  
     def gen_initial_expected_values(self, hand):
@@ -43,7 +44,7 @@ class SmartExpectedValueAngent:
         if self.expected_values is None:
             self.gen_initial_expected_values(hand)
         self.update_expected_values(hand) 
-        return hand[card] > 4 - card_amt or self.expected_values[player_index][card] < -1.5
+        return hand[card] > 4 - card_amt or self.expected_values[player_index][card] < self.threshold
     
     def give_info(self, player_indexes_picked_up):
         for card in self.in_pile:
@@ -61,34 +62,3 @@ class SmartExpectedValueAngent:
     def reset(self):
         self.expected_values = None
         self.in_pile = []
-
-
-
-class BSCallLearningAgent(Agent):
-    def __init__(self, my_index, num_players, agent_args):
-        self.my_index = my_index
-        self.num_players = num_players
-        self.num_decks = agent_args["num_decks"]
-        self.expected_values = None # generated later when we are given our first hand
-        self.in_pile = []
-        self.model = _Model(7, agent_args["hidden_layer_size"], 2)
-        self.data = []
-        self.hand_sizes = [self.num_decks * 13] * self.num_players
-        self.last_caller = None
-        self.criterion = nn.CrossEntropyLoss()  # Loss function for classification tasks
-        self.optimizer = optim.Adam(self.model.parameters(), lr=agent_args["learning_rate"])
-        self.train_every = agent_args["train_every"]
-        if "load_model" in agent_args and agent_args["load_model"] is not None:
-            self.load_model(agent_args["load_model"])
-
-    def gen_initial_expected_values(self, hand):
-        self.expected_values = [{card : 0 for card in cards} for _ in range(self.num_players)]
-        cards_left = {card: 4 * self.num_decks for card in cards}
-        for card in hand:
-            cards_left[card] -= 1
-            self.expected_values[self.my_index][card] += 1
-
-        for i in range(self.num_players):
-            if i != self.my_index:
-                self.expected_values[i] = {card : cards_left[card] / (self.num_players - 1) for card in cards}
-
