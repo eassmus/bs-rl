@@ -39,6 +39,16 @@ class GameMetrics:
         self.decks = decks
         self.winner = winner
 
+    def get_bs_rate(self, player_index): # returns correct, incorrect calls
+        correct = 0
+        incorrect = 0
+        for round in self.rounds:
+            if player_index in round.bs_calls == round.was_bs:
+                correct += 1
+            else:
+                incorrect += 1
+        return correct, incorrect
+
     def get_text(self):
         out = ""
         for round in self.rounds:
