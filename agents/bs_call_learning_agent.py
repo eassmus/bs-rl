@@ -36,7 +36,7 @@ class BSCallLearningAgent(Agent):
         self.num_decks = agent_args["num_decks"]
         self.expected_values = None # generated later when we are given our first hand
         self.in_pile = []
-        self.model = _Model(6, agent_args["hidden_layer_size"], 2)
+        self.model = _Model(7, agent_args["hidden_layer_size"], 2)
         self.data = []
         self.hand_sizes = [self.num_decks * 13] * self.num_players
         self.last_caller = None
@@ -94,7 +94,7 @@ class BSCallLearningAgent(Agent):
         if self.expected_values is None:
             self.gen_initial_expected_values(hand)
         self.update_expected_values(hand)
-        d = [self.expected_values[p][card] for p in range(self.num_players)] + [self.hand_sizes[player_index]] + [card_amt]
+        d = [self.expected_values[p][card] for p in range(self.num_players)] + [self.hand_sizes[player_index]] + [card_amt] + [len(self.in_pile)]
         self.data.append(("data", d))
         self.hand_sizes[player_index] -= card_amt
         model_result = self.model.forward(tensor([d],dtype=float32))[0]
