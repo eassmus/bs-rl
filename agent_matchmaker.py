@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from agents.random_agent import RandomAgent
 from agents.simple_agent import SimpleAgent
-from agents.smarter_simple_agent import SmartSimpleAngent
+from agents.smarter_simple_agent import SmartSimpleAgent
 from agents.aggressive_agent import AggressiveAgent
 from env import BSEnv
 
@@ -25,24 +25,28 @@ def update_ratings(ratings, outcomes, K=32):
     return new_ratings
 
 class AgentPlayer:
-    def __init__(self, agent_type, initial_rating=1200):
+    def __init__(self, agent_type, agent_args = [], initial_rating=1200):
         self.agent_type = agent_type  
         self.rating = initial_rating 
+        self.agent_args = agent_args
 
     def __repr__(self):
         return f"<AgentPlayer(type={self.agent_type.__name__}, rating={self.rating})>"
 
 class MatchMaker:
-    def __init__(self, agent_types, num_agents_per_type=20, initial_rating=1200):
+    def __init__(self, agent_types, num_agents_per_type=20, agent_args=None, initial_rating=1200):
         self.agent_types = agent_types
         self.agents = [] 
         self.wins = {agent_type: 0 for agent_type in agent_types} 
+        self.agent_args = agent_args
         
         # create a bunch of agents of each agent type, each with their own rating (not shared)
+        i = 0
         for agent_type in agent_types:
             for _ in range(num_agents_per_type):
-                agent_instance = AgentPlayer(agent_type, initial_rating)
+                agent_instance = AgentPlayer(agent_type, initial_rating=initial_rating, agent_args=agent_args[i])
                 self.agents.append(agent_instance)
+            i += 1
 
     def form_groups(self):
         """Form groups of 4 randomly between agents."""
@@ -65,7 +69,7 @@ class MatchMaker:
             
             # run some matches in the same group
             for _ in range(matches):
-                env = BSEnv(agent_types=[agent.agent_type for agent in group])
+                env = BSEnv(agent_types=[agent.agent_type for agent in group], agent_args=[agent.agent_args for agent in group])
                 env.reset()
                 game_results = env.run_game()
                 winner_index = game_results.winner
@@ -109,12 +113,10 @@ class MatchMaker:
             groups = self.form_groups()
             self.run_matches(groups, matches=matches_per_group)
 
-# example
-if __name__ == "__main__":
+def matchmake(agent_types, agent_args = None):
     random.seed(0)
-    agent_types = [SimpleAgent, SmartSimpleAngent, AggressiveAgent, RandomAgent]
     num_agents_per_type = 8
-    matchmaker = MatchMaker(agent_types,num_agents_per_type)
+    matchmaker = MatchMaker(agent_types,num_agents_per_type = num_agents_per_type, agent_args=agent_args)
 
     num_iterations = 500
     matches_per_group = 3
@@ -125,3 +127,7 @@ if __name__ == "__main__":
     for agent_name, elo, win in results:
         print(f"{agent_name} Elo: {elo:.2f}, Wins: {win}")
 
+
+# example
+if __name__ == "__main__":
+    matchmake([SimpleAgent, SmartSimpleAgent, AggressiveAgent, RandomAgent])
