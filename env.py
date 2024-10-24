@@ -53,6 +53,7 @@ class BSEnv:
             print("Pile:", self.pile)
             raise AssertionError("Total card count does not equal 52.")
 
+
     def reset(self):
         self.finished = False
         self.turn = 0
@@ -63,6 +64,7 @@ class BSEnv:
         random.shuffle(deck)
         cards_per_player = (52 * self.decks) // self.num_players
         self.player_hands = [defaultdict(int) for _ in range(0, len(self.agent_types))]
+
         for i in range(len(deck)): 
             self.player_hands[i // cards_per_player][deck[i]] += 1
 
@@ -132,7 +134,7 @@ class BSEnv:
                 if sum([player_hand[card] for card in player_hand]) == 0:
                     # end game
                     self.finished = True
-
+ 
             # sanity check to make sure no cards are being duplicated/deleted
             self.sanity_check()
         
