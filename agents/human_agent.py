@@ -29,12 +29,12 @@ class HumanAgent(Agent):
 
     def get_call_bs(self, player_index, card, card_amt, hand) -> bool:
         print(player_index, "played", card_amt, card)
-        self.print(hand)
+        self.print_hand(hand)
         while True:
             response = input("Call BS (Y|N):")
             if response.strip() == "Y":
                 return True
-            elif response .strip()== "N":
+            elif response.strip()== "N":
                 return False
             else:
                 print("Invalid input")
