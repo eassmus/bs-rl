@@ -13,3 +13,6 @@ class Agent:
     
     def reset(self):
         raise NotImplementedError
+    
+    def give_full_info(self, was_bs):
+        raise NotImplementedError
