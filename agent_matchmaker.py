@@ -30,6 +30,9 @@ class AgentPlayer:
         self.rating = initial_rating 
         self.agent_args = agent_args
 
+    def agent_indentifier(self):
+        return self.agent_type.__name__ + "  :  " + str(self.agent_args)
+
     def __repr__(self):
         return f"<AgentPlayer(type={self.agent_type.__name__}, rating={self.rating})>"
 
@@ -37,7 +40,6 @@ class MatchMaker:
     def __init__(self, agent_types, num_agents_per_type=20, agent_args=None, initial_rating=1200):
         self.agent_types = agent_types
         self.agents = [] 
-        self.wins = {agent_type: 0 for agent_type in agent_types} 
         self.agent_args = agent_args
         
         # create a bunch of agents of each agent type, each with their own rating (not shared)
@@ -47,6 +49,9 @@ class MatchMaker:
                 agent_instance = AgentPlayer(agent_type, initial_rating=initial_rating, agent_args=agent_args[i])
                 self.agents.append(agent_instance)
             i += 1
+
+        self.wins = {a.agent_indentifier(): 0 for a in self.agents} 
+
 
     def form_groups(self):
         """Form groups of 4 randomly between agents."""
@@ -77,8 +82,7 @@ class MatchMaker:
 
             # update wins per agent type
             for j, agent in enumerate(group):
-                agent_type = agent.agent_type
-                self.wins[agent_type] += wins[j]
+                self.wins[agent.agent_indentifier()] += wins[j]
             
             # update ratings based on expected value
             normalized_outcomes = [win / sum(wins) for win in wins]
@@ -90,18 +94,17 @@ class MatchMaker:
 
     def report_results(self):
         """Report the results with average ratings and wins per agent type."""
-        type_ratings = {agent_type: [] for agent_type in self.agent_types}
+        type_ratings = {a.agent_indentifier(): [] for a in self.agents}
         
         for agent in self.agents:
-            agent_type = agent.agent_type
-            type_ratings[agent_type].append(agent.rating)
+            type_ratings[agent.agent_indentifier()].append(agent.rating)
         
         average_ratings = {agent_type: sum(ratings) / len(ratings)
                            for agent_type, ratings in type_ratings.items()}
         
         elo_and_wins = [
-            (agent_type.__name__, average_ratings[agent_type], self.wins[agent_type])
-            for agent_type in self.agent_types
+            (a, average_ratings[a], self.wins[a])
+            for a in set(a.agent_indentifier() for a in self.agents)
         ]
 
         sorted_elo_and_wins = sorted(elo_and_wins, key=lambda x: x[1], reverse=True)
