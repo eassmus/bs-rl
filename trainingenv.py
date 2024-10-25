@@ -26,6 +26,9 @@ class TrainingBSEnv(env.BSEnv):
     def run_game(self):
         self.reset()
         while not self.finished:
+            if self.total_turns > 10000:
+                print("Game Not Stopping")
+                self.finished = True
             starting_hands = deepcopy(self.player_hands)
             starting_pile = deepcopy(self.pile)
 
@@ -59,15 +62,14 @@ class TrainingBSEnv(env.BSEnv):
                         self.players[player_index].give_info([self.turn])
 
                 else:
-                    for card_pile in self.pile:
-                        # split evenly among players who bid true
-                        loser_indexes = [other_player for other_player in range(self.num_players) if bids[other_player] == True]
-                        
-                        pile_size = len(self.pile)
-                        for i in range(pile_size):
-                            if len(self.pile) == 0:
-                                break
-                            self.player_hands[loser_indexes[i % len(loser_indexes)]][self.pile.pop()] += 1
+                    # split evenly among players who bid true
+                    loser_indexes = [other_player for other_player in range(self.num_players) if bids[other_player] == True]
+                    
+                    pile_size = len(self.pile)
+                    for i in range(pile_size):
+                        if len(self.pile) == 0:
+                            break
+                        self.player_hands[loser_indexes[i % len(loser_indexes)]][self.pile.pop()] += 1
 
                     for player_index in range(self.num_players):
                         self.players[player_index].give_info(loser_indexes)

@@ -80,6 +80,9 @@ class BSEnv:
     def run_game(self):
         self.reset()
         while not self.finished:
+            if self.total_turns > 10000:
+                print("Game Not Stopping")
+                self.finished = True
             starting_hands = deepcopy(self.player_hands)
             starting_pile = deepcopy(self.pile)
 
