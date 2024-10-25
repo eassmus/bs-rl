@@ -77,7 +77,7 @@ def plt_bs_accuracy(game_metrics, player_index, n = None):
     plt.figure("BS Accuracy")
     plt.plot(player_rate)
 
-def plt_true_bs_ratio(game_metrics, player_indexes = None,n = None):
+def plt_bs_call_rate(game_metrics, player_index, n = None):
     if n is None:
         n = len(game_metrics) // 10
     calls = deque()
@@ -86,7 +86,33 @@ def plt_true_bs_ratio(game_metrics, player_indexes = None,n = None):
     rate = []
     for game in game_metrics:
         for round in game.rounds:
-            if player_indexes is not None and round.player_index not in player_indexes:
+            if player_index in round.bs_calls:
+                calls.append(1)
+                window_bs += 1
+            else:
+                calls.append(0)
+                window_not_bs += 1
+            if len(calls) > n:
+                r = calls.popleft()
+                if r == 1:
+                    window_bs -= 1
+                else:
+                    window_not_bs -= 1
+            rate.append(window_bs / (window_bs + window_not_bs))
+
+    plt.figure("BS Call Rate")
+    plt.plot(rate)
+
+def plt_true_bs_ratio(game_metrics, player_index = None,n = None):
+    if n is None:
+        n = len(game_metrics) // 10
+    calls = deque()
+    window_bs = 0
+    window_not_bs = 0
+    rate = []
+    for game in game_metrics:
+        for round in game.rounds:
+            if player_index is not None and round.player_index not in player_index:
                 continue
             if round.was_bs:
                 calls.append(1)
@@ -102,7 +128,7 @@ def plt_true_bs_ratio(game_metrics, player_indexes = None,n = None):
                     window_not_bs -= 1
             rate.append(window_bs / (window_bs + window_not_bs))
 
-    plt.figure("Overall BS Rate")
+    plt.figure("BS Call Rate " + str(player_index))
     plt.plot(rate)
     
 
