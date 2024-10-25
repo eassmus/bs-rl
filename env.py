@@ -34,6 +34,7 @@ class BSEnv:
         self.players = []
         self.decks = decks
         self.players = []
+        self.starting_turn = 0
         for i, agent_type in enumerate(self.agent_types):
             # initialize players
             if len(agent_args) > 0 and len(agent_args[i]) > 0:
@@ -41,6 +42,10 @@ class BSEnv:
             else:
                 self.players.append(agent_type(i, self.num_players))
         self.reset()
+
+    def rotate_dealer(self):
+        self.starting_turn += 1
+        self.starting_turn %= self.num_players
 
     def sanity_check(self):
         try:
@@ -56,7 +61,7 @@ class BSEnv:
 
     def reset(self):
         self.finished = False
-        self.turn = 0
+        self.turn = self.starting_turn
         self.total_turns = 0
         self.pile = []
         self.action_history = []
