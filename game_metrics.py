@@ -76,7 +76,6 @@ def plt_bs_accuracy(game_metrics, player_index, n = None):
 
     plt.figure("BS Accuracy")
     plt.plot(player_rate)
-    plt.show()
 
 def plt_true_bs_ratio(game_metrics, player_indexes = None,n = None):
     if n is None:
@@ -105,7 +104,7 @@ def plt_true_bs_ratio(game_metrics, player_indexes = None,n = None):
 
     plt.figure("Overall BS Rate")
     plt.plot(rate)
-    plt.show()
+    
 
 def plt_avg_delta_cards(game_metrics, player_index, n = None):
     if n is None:
@@ -122,9 +121,9 @@ def plt_avg_delta_cards(game_metrics, player_index, n = None):
                 window_delta -= calls.popleft()
                 rate.append(window_delta / len(calls))
 
-    plt.figure("Avg. Delta Cards")
+    plt.figure("Avg. Delta Cards " + str(player_index))
     plt.plot(rate)
-    plt.show()
+    
 
 def plt_win_rate(game_metrics, player_index, n = None):
     if n is None:
@@ -142,6 +141,6 @@ def plt_win_rate(game_metrics, player_index, n = None):
             window_wins -= calls.popleft()
             rate.append(window_wins / len(calls))
 
-    plt.figure("Win Rate")
+    plt.figure("Win Rate " + str(player_index))
     plt.plot(rate)
-    plt.show()
+    
