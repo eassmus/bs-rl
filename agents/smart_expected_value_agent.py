@@ -36,15 +36,21 @@ class SmartExpectedValueAngent:
         future_cards = [cards[(current_card + i * self.num_players) % 13] for i in range(1,14)]
         for card in future_cards[::-1]:
             if hand[card] > 0:
+                for _  in range(hand[card]):
+                    self.in_pile.append(card)
                 return card, hand[card]
         random_chosen = [card for card in hand if hand[card] > 0][0]
+        for _ in range(hand[random_chosen]):
+            self.in_pile.append(random_chosen)
         return random_chosen, hand[random_chosen]
 
     def get_call_bs(self, player_index, card, card_amt, hand):
+        for _ in range(card_amt):
+            self.in_pile.append(card)
         if self.expected_values is None:
             self.gen_initial_expected_values(hand)
         self.update_expected_values(hand) 
-        return hand[card] > 4 - card_amt or self.expected_values[player_index][card] < self.threshold
+        return hand[card] > 4 - card_amt or card_amt - self.expected_values[player_index][card] > self.threshold
     
     def give_info(self, player_indexes_picked_up):
         for card in self.in_pile:
