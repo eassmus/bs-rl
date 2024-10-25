@@ -74,7 +74,7 @@ def plt_bs_accuracy(game_metrics, player_index, n = None):
                     window_incorrect -= 1
                 player_rate.append(window_correct / (window_correct + window_incorrect))
 
-    plt.figure("BS Accuracy")
+    plt.figure("BS Accuracy " + str(player_index))
     plt.plot(player_rate)
 
 def plt_bs_call_rate(game_metrics, player_index, n = None):
@@ -100,7 +100,7 @@ def plt_bs_call_rate(game_metrics, player_index, n = None):
                     window_not_bs -= 1
             rate.append(window_bs / (window_bs + window_not_bs))
 
-    plt.figure("BS Call Rate")
+    plt.figure("BS Call Rate " + str(player_index))
     plt.plot(rate)
 
 def plt_true_bs_ratio(game_metrics, player_index = None,n = None):
@@ -128,7 +128,7 @@ def plt_true_bs_ratio(game_metrics, player_index = None,n = None):
                     window_not_bs -= 1
             rate.append(window_bs / (window_bs + window_not_bs))
 
-    plt.figure("BS Call Rate " + str(player_index))
+    plt.figure("BS Ratio " + "" if player_index is None else str(player_index))
     plt.plot(rate)
     
 
