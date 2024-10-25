@@ -125,8 +125,9 @@ def matchmake(agent_types, num_agents_per_type = 9, num_iterations = 500, matche
     results = matchmaker.report_results()
 
     print(f"Elo Ratings and Total Wins (Sorted by Elo):")
+    max_name_length = max(len(agent_name) for agent_name, _, _ in results)
     for agent_name, elo, win in results:
-        print(f"{agent_name} Elo: {elo:.2f}, Wins: {win}")
+        print(f"{agent_name} {' ' * (max_name_length - len(agent_name))} Elo: {elo:.2f}, Wins: {win}")
 
 
 # example
