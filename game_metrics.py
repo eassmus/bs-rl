@@ -1,3 +1,6 @@
+from matplotlib import pyplot as plt
+from collections import deque
+
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 
 class RoundPlayed:
@@ -39,19 +42,106 @@ class GameMetrics:
         self.decks = decks
         self.winner = winner
 
-    def get_bs_rate(self, player_index): # returns correct, incorrect calls
-        correct = 0
-        incorrect = 0
-        for round in self.rounds:
-            if (player_index in round.bs_calls) == round.was_bs:
-                correct += 1
-            else:
-                incorrect += 1
-        return correct, incorrect
-
     def get_text(self):
         out = ""
         for round in self.rounds:
             out += round.__str__()
             out += "\n\n"
         return out
+
+# game metrics plotting
+
+def plt_bs_accuracy(game_metrics, player_index, n = None):
+    if n is None:
+        n = len(game_metrics) // 10
+    player_rate = []
+    calls = deque()
+    window_correct = 0
+    window_incorrect = 0
+    for game in game_metrics:
+        for round in game.rounds:
+            if (player_index in round.bs_calls) == round.was_bs:
+                calls.append(1)
+                window_correct += 1
+            else:
+                calls.append(0)
+                window_incorrect += 1
+            if len(calls) > n:
+                r = calls.popleft()
+                if r == 1:
+                    window_correct -= 1
+                else:
+                    window_incorrect -= 1
+                player_rate.append(window_correct / (window_correct + window_incorrect))
+
+    plt.figure("BS Accuracy")
+    plt.plot(player_rate)
+    plt.show()
+
+def plt_true_bs_ratio(game_metrics, player_indexes = None,n = None):
+    if n is None:
+        n = len(game_metrics) // 10
+    calls = deque()
+    window_bs = 0
+    window_not_bs = 0
+    rate = []
+    for game in game_metrics:
+        for round in game.rounds:
+            if player_indexes is not None and round.player_index not in player_indexes:
+                continue
+            if round.was_bs:
+                calls.append(1)
+                window_bs += 1
+            else:
+                calls.append(0)
+                window_not_bs += 1
+            if len(calls) > n:
+                r = calls.popleft()
+                if r == 1:
+                    window_bs -= 1
+                else:
+                    window_not_bs -= 1
+            rate.append(window_bs / (window_bs + window_not_bs))
+
+    plt.figure("Overall BS Rate")
+    plt.plot(rate)
+    plt.show()
+
+def plt_avg_delta_cards(game_metrics, player_index, n = None):
+    if n is None:
+        n = len(game_metrics) // 10
+    calls = deque()
+    window_delta = 0
+    rate = []
+    for game in game_metrics:
+        for round in game.rounds:
+            if round.player_index == player_index:
+                calls.append(len(round.starting_hands[player_index]) - len(round.ending_hands[player_index]))
+                window_delta += len(round.starting_hands[player_index]) - len(round.ending_hands[player_index])
+            if len(calls) > n:
+                window_delta -= calls.popleft()
+                rate.append(window_delta / len(calls))
+
+    plt.figure("Avg. Delta Cards")
+    plt.plot(rate)
+    plt.show()
+
+def plt_win_rate(game_metrics, player_index, n = None):
+    if n is None:
+        n = len(game_metrics) // 10
+    calls = deque()
+    window_wins = 0
+    rate = []
+    for game in game_metrics:
+        if game.winner == player_index:
+            window_wins += 1
+            calls.append(1)
+        else:
+            calls.append(0)
+        if len(calls) > n:
+            window_wins -= calls.popleft()
+            rate.append(window_wins / len(calls))
+
+    plt.figure("Win Rate")
+    plt.plot(rate)
+    plt.show()
