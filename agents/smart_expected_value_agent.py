@@ -50,7 +50,7 @@ class SmartExpectedValueAngent:
         if self.expected_values is None:
             self.gen_initial_expected_values(hand)
         self.update_expected_values(hand) 
-        return hand[card] > 4 - card_amt or card_amt - self.expected_values[player_index][card] > self.threshold
+        return (hand[card] > (4 - card_amt)) or card_amt - self.expected_values[player_index][card] > self.threshold
     
     def give_info(self, player_indexes_picked_up):
         for card in self.in_pile:

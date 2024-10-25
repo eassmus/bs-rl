@@ -1,18 +1,9 @@
 from agents.agent import Agent
-from env import BSEnv
 from torch import nn
 from torch import optim
-import numpy as np
 from random import random as rand
 from torch import tensor
-from copy import deepcopy
-import game_metrics as gm
 from torch import float32
-
-"""
-Very big work in progress, not really sure what to do with it yet.
-"""
-
 
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 
@@ -40,7 +31,7 @@ class BSCallLearningAgent(Agent):
         self.data = []
         self.hand_sizes = [(52 * self.num_decks) // self.num_players] * self.num_players
         self.last_caller = None
-        self.criterion = nn.CrossEntropyLoss()  # Loss function for classification tasks
+        self.criterion = nn.NLLLoss()  # Loss function for classification tasks
         self.optimizer = optim.Adam(self.model.parameters(), lr=agent_args["learning_rate"])
         self.train_every = agent_args["train_every"]
         if "load_model" in agent_args and agent_args["load_model"] is not None:
@@ -58,6 +49,7 @@ class BSCallLearningAgent(Agent):
                 self.expected_values[i] = {card : cards_left[card] / (self.num_players - 1) for card in cards}
 
     def train(self):
+        print("Training Model")
         outputs = self.model(tensor([self.data[i][1] for i in range(0, len(self.data), 2)],dtype=float32))
         loss = self.criterion(outputs, tensor([self.data[i][1] for i in range(1, len(self.data), 2)]))
         self.optimizer.zero_grad()
@@ -84,22 +76,30 @@ class BSCallLearningAgent(Agent):
         future_cards = [cards[(current_card + i * self.num_players) % 13] for i in range(1,14)]
         for card in future_cards[::-1]:
             if hand[card] > 0:
+                for _  in range(hand[card]):
+                    self.in_pile.append(card)
                 return card, hand[card]
         random_chosen = [card for card in hand if hand[card] > 0][0]
+        for _  in range(hand[random_chosen]):
+            self.in_pile.append(random_chosen)
         return random_chosen, hand[random_chosen]
-
+    
     def get_call_bs(self, player_index, card, card_amt, hand):
         if len(self.data) > 0 and self.data[-1][0] == "data":
             self.data.pop()
         if self.expected_values is None:
             self.gen_initial_expected_values(hand)
+        for _ in range(card_amt):
+            self.in_pile.append(card)
         self.update_expected_values(hand)
-        d = [self.expected_values[p][card] for p in range(self.num_players)] + [self.hand_sizes[player_index]] + [card_amt] + [len(self.in_pile)]
+        d = [self.expected_values[p][card] + card_amt for p in range(self.num_players)] + [self.hand_sizes[player_index]] + [card_amt] + [len(self.in_pile)]
         self.data.append(("data", d))
         self.hand_sizes[player_index] -= card_amt
         model_result = self.model.forward(tensor([d],dtype=float32))[0]
         call = model_result[1] > model_result[0]
         self.last_caller = player_index
+        if hand[card] > 4 - card_amt:
+            call = True 
         return call
 
     def give_info(self, player_indexes_picked_up):
