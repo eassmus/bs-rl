@@ -90,4 +90,4 @@ class TrainingBSEnv(env.BSEnv):
             # sanity check to make sure no cards are being duplicated/deleted
             self.sanity_check()
         
-        return gm.GameMetrics(self.action_history, self.num_players, self.decks, self.turn - 1)
+        return gm.GameMetrics(self.action_history, self.num_players, self.decks, (self.turn + 3) % 4)
