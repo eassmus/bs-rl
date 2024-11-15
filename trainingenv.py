@@ -87,11 +87,11 @@ class TrainingBSEnv(env.BSEnv):
                 if sum([player_hand[card] for card in player_hand]) == 0:
                     # end game
                     self.finished = True
+                    for player in self.players:
+                        player.give_winner(self.turn - 1)
 
             # sanity check to make sure no cards are being duplicated/deleted
             self.sanity_check()
 
-            for player in self.players:
-                player.give_winner(self.turn - 1)
         
         return gm.GameMetrics(self.action_history, self.num_players, self.decks, (self.turn + 3) % 4)

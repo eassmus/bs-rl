@@ -11,7 +11,7 @@ class Agent:
     def give_info(self, player_indexes_picked_up):
         raise NotImplementedError
     
-    def reset(self, winner):
+    def reset(self):
         raise NotImplementedError
     
     def give_full_info(self, was_bs):
