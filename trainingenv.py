@@ -88,7 +88,7 @@ class TrainingBSEnv(env.BSEnv):
                     # end game
                     self.finished = True
                     for player in self.players:
-                        player.give_winner(self.turn - 1)
+                        player.give_winner((self.turn + 3) % 4)
 
             # sanity check to make sure no cards are being duplicated/deleted
             self.sanity_check()
