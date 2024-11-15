@@ -103,7 +103,7 @@ def plt_bs_call_rate(game_metrics, player_index, n = None):
     plt.figure("BS Call Rate " + str(player_index))
     plt.plot(rate)
 
-def plt_true_bs_ratio(game_metrics, player_index = None,n = None):
+def plt_true_bs_ratio(game_metrics, player_indexes = None,n = None):
     if n is None:
         n = len(game_metrics) // 10
     calls = deque()
@@ -112,7 +112,7 @@ def plt_true_bs_ratio(game_metrics, player_index = None,n = None):
     rate = []
     for game in game_metrics:
         for round in game.rounds:
-            if player_index is not None and round.player_index not in player_index:
+            if player_indexes is not None and round.player_index not in player_indexes:
                 continue
             if round.was_bs:
                 calls.append(1)
@@ -128,7 +128,7 @@ def plt_true_bs_ratio(game_metrics, player_index = None,n = None):
                     window_not_bs -= 1
             rate.append(window_bs / (window_bs + window_not_bs))
 
-    plt.figure("BS Ratio " + "" if player_index is None else str(player_index))
+    plt.figure("BS Ratio " + ("" if player_indexes is None else str(player_indexes)))
     plt.plot(rate)
     
 
