@@ -7,6 +7,7 @@ from torch import optim
 
 import math
 import random
+import copy
 
 from collections import deque
 from collections import namedtuple
@@ -68,6 +69,7 @@ class DQNAgent(Agent):
         self.last_state = None
         self.last_action = None
         self.last_card = None
+        self.last_hand = None
 
     def get_ep_chance(self):
         #print(math.exp(-1. * self.training_cycles / self.ep_end), self.training_cycles)
@@ -105,14 +107,16 @@ class DQNAgent(Agent):
         self.last_hand_size = self.hand_sizes[0]
         self.pile_size += best_action[1]
         self.hand_sizes[0] -= best_action[1]
+        self.last_hand = copy.deepcopy(hand)
+        self.last_hand[cards[best_action[0]]] -= best_action[1]
         return cards[best_action[0]], best_action[1]
 
     def check_for_reward(self, hand_size, hand):
         if self.last_hand_size == -1:
             return
-        mod_mad = {cards[i] : ((self.last_card + 4 + i * self.num_players) % 13) for i in range(0,13)}
-        mapped_hand = {mod_mad[card] : hand[card] for card in cards}
-        reward = self.last_hand_size - hand_size
+        mod_mad = {cards[i] : ((self.last_card + (i + 1) * self.num_players) % 13) for i in range(0,13)}
+        mapped_hand = {mod_mad[card] : self.last_hand[card] for card in cards}
+        reward = -hand_size
         self.replay_buffer.append(Transition(self.last_state, self.last_action, torch.tensor([mapped_hand[i] for i in range(0,13)] + self.hand_sizes + [self.pile_size], dtype=torch.float32), reward))
         self.last_hand_size = -1
 
@@ -180,3 +184,4 @@ class DQNAgent(Agent):
         self.last_state = None
         self.last_action = None
         self.last_card = None
+        self.last_hand = None
