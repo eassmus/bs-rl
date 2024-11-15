@@ -45,7 +45,11 @@ if torch.cuda.is_available():
 else:
     dev = "cpu"
 
+dev = "cpu"
+
 device = torch.device(dev)
+
+print("Using device:", device)
 
 # action_space 
 
@@ -53,6 +57,7 @@ class DQNAgent(Agent):
     def __init__(self, my_index, num_players, agent_args = []):
         self.model = q_net().to(device)
         self.reference_model = q_net().to(device)
+        self.reference_model.load_state_dict(self.model.state_dict())
         self.optimizer = optim.AdamW(self.model.parameters(), lr=agent_args["learning_rate"])
         self.my_index = my_index
         self.num_players = num_players
@@ -71,17 +76,17 @@ class DQNAgent(Agent):
         self.last_card = None
         self.last_hand = None
 
-    def get_ep_chance(self):
-        #print(math.exp(-1. * self.training_cycles / self.ep_end), self.training_cycles)
+    def get_ep_threshhold(self):
         return self.ep_end + (self.ep_start - self.ep_end) * math.exp(-1. * self.training_cycles / self.ep_decay)
 
     def get_card(self, intended_card, hand) -> tuple[str, int]:
         self.last_card = cards.index(intended_card)
         self.check_for_reward(len(hand), hand)
+        self.hand_sizes[0] = sum(hand.values())
         mod_mad = {cards[i] : ((cards.index(intended_card) + i * self.num_players) % 13) for i in range(0,13)}
         rev_mod_map = {((cards.index(intended_card) + i * self.num_players) % 13) : i for i in range(0,13)}  
         mapped_hand = {mod_mad[card] : hand[card] for card in cards}
-        state = torch.tensor([mapped_hand[i] for i in range(0,13)] + self.hand_sizes + [self.pile_size], dtype=torch.float32)
+        state = torch.tensor([mapped_hand[i] for i in range(0,13)] + self.hand_sizes + [self.pile_size], dtype=torch.float32).to(device)
         values = self.model(state)
         best_action = None
         best_value = None
@@ -95,7 +100,7 @@ class DQNAgent(Agent):
                 best_action = (card, num_cards)
                 best_value = values[i]
         #print(self.get_ep_chance())
-        if best_action is None or random.random() > self.get_ep_chance():
+        if best_action is None or random.random() > self.get_ep_threshhold():
             a = [i for i in range(0, 52)]
             random.shuffle(a)
             for i in range(52):
@@ -109,18 +114,22 @@ class DQNAgent(Agent):
         self.hand_sizes[0] -= best_action[1]
         self.last_hand = copy.deepcopy(hand)
         self.last_hand[cards[best_action[0]]] -= best_action[1]
+        print(cards[best_action[0]], best_action[1])
         return cards[best_action[0]], best_action[1]
 
     def check_for_reward(self, hand_size, hand):
+        if self.last_hand_size > hand_size:
+            print("Called on")
         if self.last_hand_size == -1:
             return
         mod_mad = {cards[i] : ((self.last_card + (i + 1) * self.num_players) % 13) for i in range(0,13)}
         mapped_hand = {mod_mad[card] : self.last_hand[card] for card in cards}
-        reward = -hand_size
-        self.replay_buffer.append(Transition(self.last_state, self.last_action, torch.tensor([mapped_hand[i] for i in range(0,13)] + self.hand_sizes + [self.pile_size], dtype=torch.float32), reward))
+        reward = self.last_hand_size - hand_size
+        self.replay_buffer.append(Transition(self.last_state, self.last_action, torch.tensor([mapped_hand[i] for i in range(0,13)] + self.hand_sizes + [self.pile_size], dtype=torch.float32).to(device), reward))
         self.last_hand_size = -1
 
     def get_call_bs(self, player_index, card, card_amt, hand) -> bool:
+        self.hand_sizes[0] = sum(hand.values())
         self.hand_sizes[(player_index - self.my_index) % 4] -= card_amt
         self.pile_size += card_amt
         self.check_for_reward(len(hand), hand)
@@ -145,8 +154,8 @@ class DQNAgent(Agent):
                                                     if s is not None])
 
         state_batch = torch.cat([state.unsqueeze(0) for state in list(batch.state)])
-        action_batch = torch.tensor(batch.action).unsqueeze(0)
-        reward_batch = torch.tensor(batch.reward).unsqueeze(0)
+        action_batch = torch.tensor(batch.action).to(device).unsqueeze(0)
+        reward_batch = torch.tensor(batch.reward).to(device).unsqueeze(0)
 
         state_action_values = self.model(state_batch).gather(1, action_batch)
 
@@ -170,13 +179,14 @@ class DQNAgent(Agent):
 
     def give_info(self, player_indexes_picked_up):
         for player_index in player_indexes_picked_up:
-            self.hand_sizes[(player_index - self.my_index) % 4] += self.pile_size // len(player_indexes_picked_up)
+            if player_index != self.my_index:
+                self.hand_sizes[(player_index - self.my_index) % 4] += self.pile_size // len(player_indexes_picked_up)
         self.pile_size = 0
 
     def give_full_info(self, was_bs):
         pass
 
-    def reset(self):
+    def reset(self, winner):
         self.train()
         self.hand_sizes = [13] * 4
         self.pile_size = 0
@@ -185,3 +195,6 @@ class DQNAgent(Agent):
         self.last_action = None
         self.last_card = None
         self.last_hand = None
+
+    def give_winner(self, winner):
+        pass

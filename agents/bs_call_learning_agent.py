@@ -128,3 +128,6 @@ class BSCallLearningAgent(Agent):
     def reset(self):
         self.expected_values = None
         self.in_pile = []
+
+    def give_winner(self, winner):
+        pass

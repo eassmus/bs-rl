@@ -23,8 +23,6 @@ class SimpleAgent(Agent):
         if card_count + card_amt > 4:
             return True
         # random BS call for fun
-        if random.random() < 0.1:
-            return True
 
         return False
 
@@ -35,4 +33,7 @@ class SimpleAgent(Agent):
         pass
 
     def reset(self):
+        pass
+
+    def give_winner(self, winner):
         pass

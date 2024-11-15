@@ -30,3 +30,6 @@ class SmartSimpleAgent:
 
     def reset(self):
         pass
+
+    def give_winner(self, winner):
+        pass

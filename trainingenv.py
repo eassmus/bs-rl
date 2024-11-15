@@ -78,7 +78,6 @@ class TrainingBSEnv(env.BSEnv):
                 self.players[player_index].give_full_info(is_bs)
 
             self.action_history.append(gm.RoundPlayed(self.turn, self.total_turns, card, card_amt, [i for i in range(self.num_players) if bids[i]], is_bs, starting_hands, deepcopy(self.player_hands), starting_pile, deepcopy(self.pile)))
-
             self.turn += 1
             self.turn %= self.num_players
             self.total_turns += 1
@@ -91,5 +90,8 @@ class TrainingBSEnv(env.BSEnv):
 
             # sanity check to make sure no cards are being duplicated/deleted
             self.sanity_check()
+
+            for player in self.players:
+                player.give_winner(self.turn - 1)
         
         return gm.GameMetrics(self.action_history, self.num_players, self.decks, (self.turn + 3) % 4)

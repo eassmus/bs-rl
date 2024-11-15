@@ -141,8 +141,8 @@ def plt_avg_delta_cards(game_metrics, player_index, n = None):
     for game in game_metrics:
         for round in game.rounds:
             if round.player_index == player_index:
-                calls.append(len(round.starting_hands[player_index]) - len(round.ending_hands[player_index]))
-                window_delta += len(round.starting_hands[player_index]) - len(round.ending_hands[player_index])
+                calls.append(sum(round.starting_hands[player_index].values()) - sum(round.ending_hands[player_index].values()))
+                window_delta += sum(round.starting_hands[player_index].values()) - sum(round.ending_hands[player_index].values())
             if len(calls) > n:
                 window_delta -= calls.popleft()
                 rate.append(window_delta / len(calls))

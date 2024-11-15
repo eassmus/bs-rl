@@ -12,7 +12,9 @@ class RandomAgent(Agent):
         return random.choice([card for card in hand if hand[card] > 0]), 1
     
     def get_call_bs(self, player_index, card, card_amt, hand):
-        return random.random() < self.random_chance
+        if random.random() < self.random_chance:
+            return True
+        return False
 
     def give_info(self, player_indexes_picked_up):
         pass
@@ -21,4 +23,7 @@ class RandomAgent(Agent):
         pass
 
     def reset(self):
+        pass
+
+    def give_winner(self, winner):
         pass
