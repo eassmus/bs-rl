@@ -1,4 +1,5 @@
 from agents.agent import Agent
+from agents.bs_call_learning_agent import BSCallLearningAgent
 
 import torch
 from torch.nn import functional as F
@@ -24,9 +25,10 @@ def action_decode(action):
 class q_net(nn.Module):
     def __init__(self):
         super(q_net, self).__init__()
-        self.l1 = nn.Linear(observation_space_size, 256)
-        self.l2 = nn.Linear(256, 256)
-        self.l3 = nn.Linear(256, action_space_size)
+        self.l1 = nn.Linear(observation_space_size, 512)
+        self.l2 = nn.Linear(512, 512)
+        self.l3 = nn.Linear(512, 512)
+        self.l4 = nn.Linear(512, action_space_size)
 
     def forward(self, x):
         out = self.l1(x)
@@ -34,6 +36,8 @@ class q_net(nn.Module):
         out = self.l2(out)
         out = F.relu(out)
         out = self.l3(out)
+        out = F.relu(out)
+        out = self.l4(out)
         return out
 
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
@@ -44,8 +48,6 @@ if torch.cuda.is_available():
     dev = "cuda:0"
 else:
     dev = "cpu"
-
-dev = "cpu"
 
 device = torch.device(dev)
 
@@ -58,7 +60,7 @@ class DQNAgent(Agent):
         self.model = q_net().to(device)
         self.reference_model = q_net().to(device)
         self.reference_model.load_state_dict(self.model.state_dict())
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=agent_args["learning_rate"])
+        self.optimizer = optim.SGD(self.model.parameters(), lr=agent_args["learning_rate"])
         self.my_index = my_index
         self.num_players = num_players
         self.num_decks = agent_args["num_decks"]
@@ -68,18 +70,29 @@ class DQNAgent(Agent):
         self.replay_buffer = deque(maxlen=1000)
         self.ep_decay = agent_args["ep_decay"]
         self.ep_start = 0.9
-        self.ep_end = 0.01
+        if "ep_start" in agent_args and agent_args["ep_start"] is not None:
+            self.ep_start = agent_args["ep_start"]
+        self.ep_end = 0.1
         self.training_cycles = 0
         self.batch_size = agent_args["batch_size"]
         self.last_state = None
         self.last_action = None
         self.last_card = None
         self.last_hand = None
+        self.tau = 0.01
+        
+        self.bs_agent = BSCallLearningAgent(my_index, num_players, agent_args)
+
+        if "load_models" in agent_args and agent_args["load_models"] is not None:
+            self.load_model(agent_args["load_models"][0], agent_args["load_models"][1])
 
     def get_ep_threshhold(self):
+        #print(self.ep_end + (self.ep_start - self.ep_end) * math.exp(-1. * self.training_cycles / self.ep_decay))
         return self.ep_end + (self.ep_start - self.ep_end) * math.exp(-1. * self.training_cycles / self.ep_decay)
 
     def get_card(self, intended_card, hand) -> tuple[str, int]:
+        self.bs_agent.get_card(intended_card, hand)
+
         self.last_card = cards.index(intended_card)
         self.check_for_reward(len(hand), hand)
         self.hand_sizes[0] = sum(hand.values())
@@ -114,21 +127,19 @@ class DQNAgent(Agent):
         self.hand_sizes[0] -= best_action[1]
         self.last_hand = copy.deepcopy(hand)
         self.last_hand[cards[best_action[0]]] -= best_action[1]
-        print(cards[best_action[0]], best_action[1])
         return cards[best_action[0]], best_action[1]
 
     def check_for_reward(self, hand_size, hand):
-        if self.last_hand_size > hand_size:
-            print("Called on")
         if self.last_hand_size == -1:
             return
         mod_mad = {cards[i] : ((self.last_card + (i + 1) * self.num_players) % 13) for i in range(0,13)}
         mapped_hand = {mod_mad[card] : self.last_hand[card] for card in cards}
-        reward = self.last_hand_size - hand_size
+        reward = 0 #self.last_hand_size - hand_size
         self.replay_buffer.append(Transition(self.last_state, self.last_action, torch.tensor([mapped_hand[i] for i in range(0,13)] + self.hand_sizes + [self.pile_size], dtype=torch.float32).to(device), reward))
         self.last_hand_size = -1
 
     def get_call_bs(self, player_index, card, card_amt, hand) -> bool:
+        return self.bs_agent.get_call_bs(player_index, card, card_amt, hand)
         self.hand_sizes[0] = sum(hand.values())
         self.hand_sizes[(player_index - self.my_index) % 4] -= card_amt
         self.pile_size += card_amt
@@ -139,6 +150,14 @@ class DQNAgent(Agent):
             return True
         return False
   
+    def save_model(self):
+        return self.model.state_dict(), self.bs_agent.get_model()
+    
+    def load_model(self, model, bs_model):
+        self.model.load_state_dict(model)
+        self.reference_model.load_state_dict(model)
+        self.bs_agent.load_model(bs_model)
+
     def train(self):
         if len(self.replay_buffer) < self.batch_size:
             return
@@ -174,19 +193,23 @@ class DQNAgent(Agent):
         self.optimizer.step()
 
         self.training_cycles += 1
-        if self.training_cycles % 100 == 0:
-            self.reference_model.load_state_dict(self.model.state_dict())
+        d = self.reference_model.state_dict()
+        for k in d.keys():
+            d[k] = d[k] * (1 - self.tau) + self.model.state_dict()[k] * self.tau
+        self.reference_model.load_state_dict(d)
 
     def give_info(self, player_indexes_picked_up):
+        self.bs_agent.give_info(player_indexes_picked_up)
         for player_index in player_indexes_picked_up:
             if player_index != self.my_index:
                 self.hand_sizes[(player_index - self.my_index) % 4] += self.pile_size // len(player_indexes_picked_up)
         self.pile_size = 0
 
     def give_full_info(self, was_bs):
-        pass
+        self.bs_agent.give_full_info(was_bs)
 
-    def reset(self, winner):
+    def reset(self):
+        self.bs_agent.reset()
         self.train()
         self.hand_sizes = [13] * 4
         self.pile_size = 0
@@ -197,4 +220,9 @@ class DQNAgent(Agent):
         self.last_hand = None
 
     def give_winner(self, winner):
-        pass
+        self.bs_agent.give_winner(winner)
+        if winner == self.my_index:
+            self.replay_buffer.append(Transition(self.last_state, self.last_action, None, 50))
+        else:
+            self.replay_buffer.append(Transition(self.last_state, self.last_action, None, 0))
+
