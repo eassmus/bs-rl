@@ -51,9 +51,11 @@ class GameMetrics:
 
 # game metrics plotting
 
+partition_size = 6
+
 def plt_bs_accuracy(game_metrics, player_index, n = None):
     if n is None:
-        n = len(game_metrics) // 10
+        n = len(game_metrics) // partition_size
     player_rate = []
     calls = deque()
     window_correct = 0
@@ -77,9 +79,38 @@ def plt_bs_accuracy(game_metrics, player_index, n = None):
     plt.figure("BS Accuracy " + str(player_index))
     plt.plot(player_rate)
 
+def plt_bs_called_accuracy(game_metrics, player_index, n = None):
+    if n is None:
+        n = len(game_metrics) // partition_size
+    player_rate = []
+    calls = deque()
+    window_correct = 0
+    window_incorrect = 0
+    for game in game_metrics:
+        for round in game.rounds:
+            if player_index not in round.bs_calls:
+                calls.append(0)
+                continue
+            if round.was_bs:
+                calls.append(1)
+                window_correct += 1
+            else:
+                calls.append(-1)
+                window_incorrect += 1
+            if len(calls) > n:
+                r = calls.popleft()
+                if r == 1:
+                    window_correct -= 1
+                elif r == -1:
+                    window_incorrect -= 1
+                player_rate.append((window_correct - window_incorrect) / (window_correct + window_incorrect))
+
+    plt.figure("BS Called Accuracy " + str(player_index))
+    plt.plot(player_rate)
+
 def plt_bs_call_rate(game_metrics, player_index, n = None):
     if n is None:
-        n = len(game_metrics) // 10
+        n = len(game_metrics) // partition_size
     calls = deque()
     window_bs = 0
     window_not_bs = 0
@@ -105,7 +136,7 @@ def plt_bs_call_rate(game_metrics, player_index, n = None):
 
 def plt_true_bs_ratio(game_metrics, player_indexes = None,n = None):
     if n is None:
-        n = len(game_metrics) // 10
+        n = len(game_metrics) // partition_size
     calls = deque()
     window_bs = 0
     window_not_bs = 0
@@ -134,7 +165,7 @@ def plt_true_bs_ratio(game_metrics, player_indexes = None,n = None):
 
 def plt_avg_delta_cards(game_metrics, player_index, n = None):
     if n is None:
-        n = len(game_metrics) // 10
+        n = len(game_metrics) // partition_size
     calls = deque()
     window_delta = 0
     rate = []
@@ -153,7 +184,7 @@ def plt_avg_delta_cards(game_metrics, player_index, n = None):
 
 def plt_win_rate(game_metrics, player_index, n = None):
     if n is None:
-        n = len(game_metrics) // 10
+        n = len(game_metrics) // partition_size
     calls = deque()
     window_wins = 0
     rate = []
@@ -170,3 +201,19 @@ def plt_win_rate(game_metrics, player_index, n = None):
     plt.figure("Win Rate " + str(player_index))
     plt.plot(rate)
     
+def plt_duration(game_metrics, n = None):
+    if n is None:
+        n = len(game_metrics) // partition_size
+    calls = deque()
+    window_duration = 0
+    rate = []
+    for game in game_metrics:
+        for round in game.rounds:
+            window_duration += round.total_turns
+            calls.append(round.total_turns)
+        if len(calls) > n:
+            window_duration -= calls.popleft()
+            rate.append(window_duration / len(calls))
+
+    plt.figure("Durations")
+    plt.plot(rate)
