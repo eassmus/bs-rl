@@ -35,7 +35,7 @@ class BSCallLearningAgent(Agent):
         self.num_decks = agent_args["num_decks"]
         self.expected_values = None  # generated later when we are given our first hand
         self.in_pile = []
-        self.model = _Model(8, 1)
+        self.model = _Model(7, 1)
         self.data = []
         self.hand_sizes = [(52 * self.num_decks) // self.num_players] * self.num_players
         self.last_caller = None
@@ -92,7 +92,8 @@ class BSCallLearningAgent(Agent):
         return self.model.state_dict()
 
     def load_model(self, model):
-        self.model.load_state_dict(model)
+        if model is not None:
+            self.model.load_state_dict(model)
 
     def update_expected_values(self, hand):
         for card in cards:
@@ -127,7 +128,9 @@ class BSCallLearningAgent(Agent):
             self.in_pile.append(card)
         self.update_expected_values(hand)
         d = (
-            [self.expected_values[p][card] + card_amt for p in range(self.num_players)]
+            [self.expected_values[player_index][card]] +
+            [sum(self.expected_values[(player_index + p) % 4][card] + card_amt for p in range(1, self.num_players))]
+            + [hand[card]]
             + [self.hand_sizes[(player_index - self.my_index) % 4]]
             + [card_amt]
             + [len(self.in_pile)]
@@ -137,7 +140,6 @@ class BSCallLearningAgent(Agent):
             self.data.append(("data", d))
         self.hand_sizes[(player_index - self.my_index) % 4] -= card_amt
         model_result = self.model.forward(tensor([d], dtype=float32))[0]
-        # print(model_result)
         call = model_result.item() > self.required_confidence
         # print(call)
         self.last_caller = player_index
