@@ -1,5 +1,3 @@
-import numpy as np
-import torch
 import os
 import glob
 import time
@@ -7,7 +5,6 @@ from datetime import datetime
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.distributions import MultivariateNormal
 from torch.distributions import Categorical
 
@@ -23,11 +20,11 @@ if(torch.cuda.is_available()):
 else:
     print("Device set to : cpu")
 
+import torch.nn.functional as F
 
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 
 # PPO code adapted from PPO-Pytorch
-# added compatibility with action masks with minor changes
 class RolloutBuffer:
     def __init__(self):
         self.actions = []
@@ -87,7 +84,9 @@ class ActorCritic(nn.Module):
                         nn.Tanh(),
                         nn.Linear(64, 1)
                     )
-
+        self.imitate_optimizer = torch.optim.Adam(self.actor.parameters(), 1e-3)
+        self.CrossEntropyLoss = nn.CrossEntropyLoss()
+        
     def set_action_std(self, new_action_std):
 
         if self.has_continuous_action_space:
@@ -102,8 +101,8 @@ class ActorCritic(nn.Module):
         raise NotImplementedError
 
 
-    def act(self, state, action_mask=None):
-        
+    def act(self, state, action_mask=None, intended_card_index=None):
+
         if self.has_continuous_action_space:
             action_mean = self.actor(state)
             cov_mat = torch.diag(self.action_var).unsqueeze(dim=0)
@@ -112,11 +111,16 @@ class ActorCritic(nn.Module):
             logits = self.actor(state)
             if action_mask is not None:
                 # mask out invalid actions
-                logits = logits + (action_mask == 0).float() * -1e10
-
+                logits = logits + (action_mask + 1e-45).log()
+            #print(action_mask)
             action_probs = torch.softmax(logits, dim=-1)
-            dist = Categorical(action_probs)
-
+            #print(action_probs)
+            if intended_card_index == -1:
+                action_probs[0] *= 2
+                action_probs = action_probs / action_probs.sum()
+                
+            dist = Categorical(action_probs[action_mask.to(torch.bool)])
+            
         action = dist.sample()
         action_logprob = dist.log_prob(action)
         state_val = self.critic(state)
@@ -146,8 +150,9 @@ class ActorCritic(nn.Module):
             dist = Categorical(action_probs)
 
         action_logprobs = dist.log_prob(action)
-        dist_entropy = dist.entropy()
+        
         state_values = self.critic(state)
+        dist_entropy = dist.entropy()
 
         return action_logprobs, state_values, dist_entropy
 
@@ -210,12 +215,12 @@ class PPO:
         print("--------------------------------------------------------------------------------------------")
 
 
-    def select_action(self, state, action_mask):
+    def select_action(self, state, action_mask,intended_card_index=None):
 
         if self.has_continuous_action_space:
             with torch.no_grad():
                 state = torch.FloatTensor(state).to(device)
-                action, action_logprob, state_val = self.policy_old.act(state, action_mask)
+                action, action_logprob, state_val, action_logdis = self.policy_old.act(state, action_mask)
 
             self.buffer.states.append(state)
             self.buffer.actions.append(action)
@@ -227,8 +232,8 @@ class PPO:
         else:
             with torch.no_grad():
                 state = torch.FloatTensor(state).to(device)
-                action, action_logprob, state_val = self.policy_old.act(state, action_mask)
-                
+                action, action_logprob, state_val = self.policy_old.act(state, action_mask,intended_card_index=intended_card_index)
+
             self.buffer.action_masks.append(action_mask)
             self.buffer.states.append(state)
             self.buffer.actions.append(action)
@@ -239,10 +244,11 @@ class PPO:
 
 
     def update(self):
-
+        logs = {}
         # Monte Carlo estimate of returns
         rewards = []
         discounted_reward = 0
+        #print(self.buffer.rewards)
         for reward, is_terminal in zip(reversed(self.buffer.rewards), reversed(self.buffer.is_terminals)):
             if is_terminal:
                 discounted_reward = 0
@@ -259,7 +265,7 @@ class PPO:
         old_logprobs = torch.squeeze(torch.stack(self.buffer.logprobs, dim=0)).detach().to(device)
         old_state_values = torch.squeeze(torch.stack(self.buffer.state_values, dim=0)).detach().to(device)
         old_action_masks = torch.squeeze(torch.stack(self.buffer.action_masks, dim=0)).detach().to(device)
-
+        
         # calculate advantages
         advantages = rewards.detach() - old_state_values.detach()
 
@@ -282,7 +288,7 @@ class PPO:
 
             # final loss of clipped objective PPO
             loss = -torch.min(surr1, surr2) + 0.5 * self.MseLoss(state_values, rewards) - 0.01 * dist_entropy
-
+            logs['critic_loss'] = self.MseLoss(state_values, rewards)
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
@@ -290,10 +296,12 @@ class PPO:
 
         # Copy new weights into old policy
         self.policy_old.load_state_dict(self.policy.state_dict())
-
+        
         # clear buffer
         self.buffer.clear()
-
+        #print(logs['critic_loss'])
+        #print(state_values[-3:-1])
+        #print(rewards[-3:-1])
 
     def save(self, checkpoint_path):
         torch.save(self.policy_old.state_dict(), checkpoint_path)
@@ -302,190 +310,261 @@ class PPO:
     def load(self, checkpoint_path):
         self.policy_old.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
         self.policy.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
+        
 
 class PPOAgent():
+    AGENT_CARDS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
     """ BS Agent class implemented for the PPO algorithm. Can only handle 4 players and 1 deck atm."""
     def __init__(self, my_index, num_players):
         self.my_index = my_index
         self.num_players = num_players
 
         # keep track of cards
-        self.track_pile = {card : 0 for card in cards}
+        self.track_pile = {card : 0 for card in self.AGENT_CARDS}
         self.track_pile_list = []
 
-        self.track_player_hands = [{card : 0 for card in cards} for _ in range(self.num_players)]
+        self.track_player_hands = [{card : 0 for card in self.AGENT_CARDS} for _ in range(self.num_players)]
         self.hand_sizes = [13] * self.num_players
 
         # ppo agent
         has_continuous_action_space = False
         max_training_timesteps = int(1e5)
-        max_ep_len = 400
-        update_timestep = max_ep_len * 4
+        max_ep_len = 50
+        update_timestep = max_ep_len * 2
         K_epochs = 40
-        eps_clip = 0.2
-        gamma = 0.99
-        lr_actor = 0.0003
-        lr_critic = 0.001
+        eps_clip = 0.35
+        gamma = 0.9999
+        lr_actor = 0.003
+        lr_critic = 0.01
         action_std = None
 
-        action_dim = 13*4+2 # 13 card types * 4 (choose card amount) + is_bs (0,1)
-        self.state_dim = 426
-
-        self.ppo_agent = PPO(self.state_dim, action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std)
-        self.current_ep_reward = 0
+        self.bs_state_dim = 45
+        self.play_state_dim = 100
+        
+        card_playing_action_dim = 13*4 # 13 card types * 4 (choose card amount)
+        self.card_playing_ppo_agent = PPO(self.play_state_dim, card_playing_action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std)
+        bs_action_dim = 2 # is_bs (0,1)
+        self.bs_ppo_agent = PPO(self.bs_state_dim, bs_action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std)
+        
         self.state = None
         self.previous_hand_size = 0
-        self.time_step = 0
+        self.previous_hand_size_bs = 0
+        self.hand_size_from_bs = 0
+        self.hand_size_from_play = 0
+        self.previous_bs_call = 0
 
-    @staticmethod
-    def parse_action(index):
-        """Parses out the action in the action encoding given an action index. 4x13 + 2"""
-        if index < 52:
-            card_type_index = index // 4  # Determine card type (0-12)
-            card_amount_index = index % 4 + 1  # Determine amount (1-4)
-            return {"play_card": (cards[card_type_index], card_amount_index), "is_bs": None}
-
-        else:
-            is_bs_flag = index - 52  # 52 -> 0 (no bs), 53 -> 1 (bs)
-            return {"play_card": None, "is_bs": is_bs_flag}
-
-    @staticmethod
-    def get_card_encoding(card_dict):
-        """Encodes a card dictionary by one hot encoding."""
-        one_hot_encoding = []
-
-        for card, count in card_dict.items():
-            one_hot_vector = [1 if i == count else 0 for i in range(5)]
-            one_hot_encoding.extend(one_hot_vector)
-
-        return torch.tensor(one_hot_encoding, dtype=torch.long)
+        self.bs_time_step = 0
+        self.play_time_step = 0
+        self.bs_total_rewards = 0
+        self.player_total_rewards = 0
+        
+    def parse_action(self, index, intended_card):        
+        """Parses out the action in the action encoding given an action index. 4x13"""
+        intended_card_index = self.AGENT_CARDS.index(intended_card)
+        card_type_index = index // 4 - intended_card_index  # Determine card type (0-12)
+        card_amount_index = index % 4 + 1  # Determine amount (1-4)
+        return {"play_card": (self.AGENT_CARDS[card_type_index], card_amount_index)}
 
 
-    def generate_state(self, hand, intended_card= 0, card = 0, card_amt = 0, player_to_bid_bs_on=0):
+    def get_card_encoding(self, card_dict, intended_card_index):
+        """Encodes a card dictionary by one hot encoding. Order is based on intended card."""
+        one_hot_encoding = torch.zeros((13*5))
+        
+        for i, card in enumerate(self.AGENT_CARDS):
+            assert card_dict[card] < 5
+            one_hot_index = (i-intended_card_index)*5 + card_dict[card]
+
+            one_hot_encoding[one_hot_index] = 1
+            
+        return one_hot_encoding
+
+    def get_size_encoding(self, x):
+        """Returns a tensor of size 6. One-hot, indicating what range the size is in."""
+        encoding = torch.zeros(6)
+        if x > 10:
+            encoding[0] = 1
+        elif 5 < x <= 10:
+            encoding[1] = 1
+        elif 3 < x <= 5:
+            encoding[2] = 1
+        elif x == 2:
+            encoding[3] = 1
+        elif x == 1:
+            encoding[4] = 1
+        elif x == 0:
+            encoding[5] = 1
+        return encoding
+        
+
+    def generate_state(self, hand, intended_card= "2", card_amt = 0, player_to_bid_bs_on=-1):
         """Generates the state based on the tracks and scenerio.
 
         State Encoding Overview:
 
         General Card Info
-        my_hand_encoding: 13x5
-        other_players_hand_encoding: 3x13x5
-        other_player_hand_amount: 3
-        pile: 13x5
-
-        Card Play Info
-        intended_card: 13+1 (0 is for not relevant)
-
-        Call BS Info
-        card: 13+1 (0 is for not relevant)
-        card_amt: 4+1 (0 is for not relevant)
-        player_playing_hand: 13x5 (0 is for not relevant)
-
-        for a total of... 426 features
-        """
-        my_hand_encoding = self.get_card_encoding(hand)
-        # encode other players hands (one-hot)
-        other_players_hand_encoding = []
-        for i, track_hand in enumerate(self.track_player_hands):
-            if i !=self.my_index:
-                other_players_hand_encoding.extend(self.get_card_encoding(track_hand))
-        other_players_hand_encoding = torch.tensor(other_players_hand_encoding)
-        # encode other player hand amounts by divide by 4
+        my_hand_encoding: 13x5 (in order of mod) = 45
+        my_hand_size_encoding: 6
+        other_player_hand_amount: (x > 10, 5 < x < 10, 3 < x < 5, x = 2, x = 1) * 3 = 18
+        pile_size: x > 10, 5 < x < 10, 3 < x < 5, x = 2, x = 1, x = 0 = 6
+        player_playing_hand_size_encoding: (how much of the card I have) = 5
+        
+        Call BS Info:
+        my_hand_size_encoding: 6
+        card_amt: 4
+        player_playing_hand_size: x > 10, 5 < x < 10, 3 < x < 5, x = 2, x = 1, x = 0 = 6
+        player_playing_hand_size_encoding: (how much of the card I have) = 5
+        
+        for a total of... 82 features for playing card agent, and 153 features for bs agent
+        """        
+        my_hand_encoding = self.get_card_encoding(hand, self.AGENT_CARDS.index(intended_card))
+        my_hand_size_encoding = self.get_size_encoding(self.hand_sizes[self.my_index])
+        
+        # encode other player hand amounts
         hand_amount = []
         for i, hand_amt in enumerate(self.hand_sizes):
             if i !=self.my_index:
-                hand_amount.append(hand_amt)
-        other_players_hand_amt_encoding = torch.tensor(hand_amount)/4
+                hand_amount.append(self.get_size_encoding(hand_amt))
+        other_players_hand_amt_encoding = torch.concat(hand_amount,dim=0)
 
-        # encode the pile
-        pile_encoding = self.get_card_encoding(self.track_pile)
+        # encode the pile        
+        pile_size =  self.get_size_encoding(len(self.track_pile_list))
+        cards_in_my_hand_encoding = F.one_hot(torch.tensor(hand[intended_card]),5)
 
-        # encode all the action specific stuff (one-hot)
-        intended_card_encoding = F.one_hot(torch.tensor(intended_card),14)
-        card_encoding = F.one_hot(torch.tensor(card),14)
-        card_amt_encoding = F.one_hot(torch.tensor(card_amt),5)
-
+        # encode extra for bs agent
         if player_to_bid_bs_on != -1:
-            player_playing_hand = self.get_card_encoding(self.track_player_hands[player_to_bid_bs_on])
+            card_amt_encoding = F.one_hot(torch.tensor(card_amt-1),4)
+            player_playing_hand_size = self.get_size_encoding(self.hand_sizes[player_to_bid_bs_on])
+            
+            # how many of the card in my hand
+            cards_in_my_hand_encoding = F.one_hot(torch.tensor(hand[intended_card]),5)
+
+            state = torch.concat([my_hand_size_encoding,
+                            other_players_hand_amt_encoding,
+                            pile_size,
+                            cards_in_my_hand_encoding,
+                            card_amt_encoding,
+                            player_playing_hand_size])
+            
+            assert state.shape[0] == self.bs_state_dim
         else:
-            player_playing_hand = torch.zeros(65)
-
-        # concat them all together
-        state = torch.concat([my_hand_encoding,
-                        other_players_hand_encoding,
-                        other_players_hand_amt_encoding,
-                        pile_encoding,
-                        intended_card_encoding,
-                        card_encoding,
-                        card_amt_encoding, 
-                        player_playing_hand])
-  
-
-        assert state.shape[0] == self.state_dim
+            state = torch.concat([
+                            cards_in_my_hand_encoding, my_hand_encoding, 
+                            my_hand_size_encoding,
+                            other_players_hand_amt_encoding,
+                            pile_size])
+            assert state.shape[0] == self.play_state_dim
 
         if self.state == None:
-            # this is the beginning of the game so no reward
-            self.previous_hand_size = len(hand)
-            return state, 0
+            if player_to_bid_bs_on == -1:
+                self.previous_hand_size = sum(hand.values())
+                self.hand_size_from_play = 0
+            else:
+                self.previous_hand_size_bs = sum(hand.values())
+                self.hand_size_from_bs = 0
 
-        # reward based on a reduction of previous hand size
-        reward = len(self.previous_hand_size) - len(hand)
-        self.previous_hand_size = len(hand)
+            self.state = "Training"
+            # this is the beginning of the game so no reward
+            return state, 0
+        
+        reward = 0
+        if player_to_bid_bs_on == -1:
+            # reward based on previous hand size
+            self.previous_hand_size = sum(hand.values()) 
+            reward = self.hand_size_from_play/4
+            reward = max(-6,reward)
+        else:
+            if player_to_bid_bs_on == (self.my_index+1) % 4:
+                self.hand_size_from_play = self.previous_hand_size - sum(hand.values())
+                
+            reward = self.previous_hand_size_bs - sum(hand.values())
+            reward = max(-20,reward)
+            reward = min(reward, 0)
+            
+            if reward == 0 and self.previous_bs_call == 1:
+                if (player_to_bid_bs_on-1) % 4 != self.my_index:
+                    reward+= 2/self.hand_sizes[(player_to_bid_bs_on-1) % 4]
+                else:
+                    reward+= 2/self.hand_sizes[(player_to_bid_bs_on-2) % 4]
+                
+            self.previous_hand_size_bs = sum(hand.values()) 
+            
+            if self.previous_bs_call == 0:
+                return state, 1
 
         return state, reward
 
+    def update_model(self, model, reward, done, is_bs):
+        model.buffer.rewards.append(reward)
+        model.buffer.is_terminals.append(done)
 
-    def update_model(self, reward, done):
-        self.ppo_agent.buffer.rewards.append(reward)
-        self.ppo_agent.buffer.is_terminals.append(done)
-        self.current_ep_reward += reward
-        self.time_step+=1
-
-        # update agent every 200 steps
-        if self.time_step % 200 == 0:
-            self.ppo_agent.update()
-
+        if is_bs:
+            self.bs_total_rewards += reward
+        else:
+            self.player_total_rewards += reward
+ 
         # make sure we didn't do anything stupid
-        assert(len(self.ppo_agent.buffer.rewards) == len(self.ppo_agent.buffer.actions))
+        assert(len(model.buffer.rewards) == len(model.buffer.actions))
 
     def get_card(self, intended_card, hand):
         # populate every key in hand :(
-        [hand[card] for card in cards]
-        state, reward = self.generate_state(hand,intended_card=cards.index(intended_card))
-
-        # mask out invalid actions
-        action_mask = torch.zeros(54)
-        for index in range(52):
-            card_type_index = index // 4
-            card_amount_index = index % 4 +1
-            
-            card_type = cards[card_type_index]  
-            
-            if hand[card_type] >= card_amount_index:
-                action_mask[index] = 1 
-
-    
-        action_index = self.ppo_agent.select_action(state, action_mask)
-        action = self.parse_action(action_index)
-        self.update_model(reward, False)
-
-        return action['play_card']
+        [hand[card] for card in self.AGENT_CARDS]
+        state, reward = self.generate_state(hand,intended_card=intended_card)
+        current_card = self.AGENT_CARDS.index(intended_card)
+        card_cycle = [(current_card + i * self.num_players) % 13 for i in range(1,14)][::-1]
+        
+        action_index_map = [0]*52
+        total_index = 0
+        action_mask = []
+        # reconstruct action cycle and masks based on avialable hand
+        for card in card_cycle:
+            if hand[self.AGENT_CARDS[card]] > 0:
+                action_mask.extend([1]*hand[self.AGENT_CARDS[card]])
+                for i in range(hand[self.AGENT_CARDS[card]]):
+                    action_index_map[total_index] =(self.AGENT_CARDS[card],hand[self.AGENT_CARDS[card]]-i) 
+                    total_index+=1
+                    
+        # pad the rest of mask since they are invalid
+        action_mask+=[0]*(52-len(action_mask))
+        action_mask = torch.tensor(action_mask)
+        action_index = self.card_playing_ppo_agent.select_action(state, action_mask)
+        card_type, card_amt = action_index_map[action_index]
+                
+        # only track what we played
+        self.track_pile[card_type]+=card_amt
+        self.track_pile_list.extend([card_type]*card_amt)
+        
+        should_play = None
+        # add tiny punishment for playing incorrect card
+        if hand[intended_card] > 0:
+            if card_type == intended_card:
+                reward += 2
+            else:
+                reward-=1
+                
+        self.update_model(self.card_playing_ppo_agent, reward, False, False)
+        return action_index_map[action_index]
 
     def get_call_bs(self, player_index, card, card_amt, hand):
         # populate every key in hand :(
-        [hand[card] for card in cards]
+        [hand[card] for card in self.AGENT_CARDS]
         # update our card tracks
         self.hand_sizes[player_index] -= card_amt
-        self.track_pile[card]+=card_amt
-        self.track_pile_list.extend([card]*card_amt)
+        
+        self.track_player_hands[player_index][card]-=card_amt
+        self.track_player_hands[player_index][card] = max(self.track_player_hands[player_index][card], 0)
+        
+        # add unk cards to track pile
+        self.track_pile_list.extend(["unk"]*card_amt)
 
-        state, reward = self.generate_state(hand,card=cards.index(card),card_amt=card_amt,player_to_bid_bs_on=player_index)    
-        action_mask = torch.zeros(54)
-        action_mask[52:] = 1
-        action_index = self.ppo_agent.select_action(state, action_mask)
-        action = self.parse_action(action_index)
-        self.update_model(reward, False)
-
-        return action['is_bs']
+        state, reward = self.generate_state(hand,intended_card=card,card_amt=card_amt,player_to_bid_bs_on=player_index)
+        action_mask = torch.ones(2)
+        action_index = self.bs_ppo_agent.select_action(state, action_mask, intended_card_index=-1)
+        
+        self.update_model(self.bs_ppo_agent, reward, False, True)
+        
+        self.previous_bs_call = action_index
+        
+        return action_index
 
     def give_info(self, player_indexes_picked_up):
         # update the player hand tracking
@@ -495,26 +574,51 @@ class PPOAgent():
         for i in range(pile_size):
             if len(self.track_pile_list) == 0:
                 break
-            self.track_player_hands[loser_indexes[i % len(loser_indexes)]][self.track_pile_list.pop()] += 1
+            card = self.track_pile_list.pop()
+            if card != "unk":
+                if self.track_player_hands[loser_indexes[i % len(loser_indexes)]][card] < 4:
+                    self.track_player_hands[loser_indexes[i % len(loser_indexes)]][card] += 1
+                
+                
             self.hand_sizes[loser_indexes[i % len(loser_indexes)]] +=1
+            
+        self.track_pile = {card : 0 for card in self.AGENT_CARDS}
 
     def is_finished(self, winner_index):
         # replace the last action reward with the win/lose reward
-        if len(self.ppo_agent.buffer.rewards) == 0: 
-            return
-        if self.my_index == winner_index:
-            self.ppo_agent.buffer.rewards[-1] = 500
-            self.ppo_agent.buffer.is_terminals[-1] = True
-        else:
-            self.ppo_agent.buffer.rewards[-1] = -500
-            self.ppo_agent.buffer.is_terminals[-1] = -500
-
+        if len(self.bs_ppo_agent.buffer.rewards) !=0:
+            if self.my_index == winner_index:
+                self.bs_ppo_agent.buffer.rewards[-1] = 200
+                self.bs_ppo_agent.buffer.is_terminals[-1] = True
+            else:
+                self.bs_ppo_agent.buffer.rewards[-1] = -200
+                self.bs_ppo_agent.buffer.is_terminals[-1] = True
+                
+        if len(self.card_playing_ppo_agent.buffer.rewards) !=0:
+            if self.my_index == winner_index:
+                self.card_playing_ppo_agent.buffer.rewards[-1] = 200
+                self.card_playing_ppo_agent.buffer.is_terminals[-1] = True
+            else:
+                self.card_playing_ppo_agent.buffer.rewards[-1] = -200
+                self.card_playing_ppo_agent.buffer.is_terminals[-1] = True
+                
+        self.play_time_step+=1
+        if self.play_time_step % 4 == 0:
+            self.card_playing_ppo_agent.update()
+            self.bs_ppo_agent.update()
+        
     def give_full_info(self, was_bs):
         pass
-    
+
     def reset(self):
-        pass
+        self.state = None
+        self.previous_hand_size = 0
+        
+        self.bs_total_rewards = 0
+        self.player_total_rewards = 0
 
-    def give_winner(self, winner):
-        pass
+        self.track_pile = {card : 0 for card in self.AGENT_CARDS}
+        self.track_pile_list = []
 
+        self.track_player_hands = [{card : 0 for card in self.AGENT_CARDS} for _ in range(self.num_players)]
+        self.hand_sizes = [13] * self.num_players
