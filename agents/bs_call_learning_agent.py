@@ -119,6 +119,13 @@ class BSCallLearningAgent(Agent):
             self.in_pile.append(random_chosen)
         return random_chosen, hand[random_chosen]
 
+    def load_model(self, model):
+        if model is not None:
+            self.model.load_state_dict(model)
+    
+    def save_model(self):
+        return self.model.state_dict()
+
     def get_call_bs(self, player_index, card, card_amt, hand):
         if len(self.data) > 0 and self.data[-1][0] == "data":
             self.data.pop()
