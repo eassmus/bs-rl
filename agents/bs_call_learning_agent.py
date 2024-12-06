@@ -1,21 +1,27 @@
 from agents.agent import Agent
 from torch import nn
 from torch import optim
-from random import random as rand
+import torch
 from torch import tensor
 from torch import float32
 
+import math
+
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
+
+sigmoid = nn.Sigmoid()
 
 class _Model(nn.Module):
     def __init__(self, input_size, output_size):
         super(_Model, self).__init__()
         self.relu = nn.ReLU()
-        self.sigmoid = nn.Sigmoid()
-        self.fc1 = nn.Linear(input_size, 64)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, output_size)
+        self.fc1 = nn.Linear(input_size, 128)
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, 128)
+        self.fc4 = nn.Linear(128, output_size)
 
     def forward(self, x):
         out = self.fc1(x)
@@ -23,34 +29,34 @@ class _Model(nn.Module):
         out = self.fc2(out)
         out = self.relu(out)
         out = self.fc3(out)
-        out = self.sigmoid(out)
+        out = self.relu(out)
+        out = self.fc4(out)
         return out
 
 
 class BSCallLearningAgent(Agent):
     def __init__(self, my_index, num_players, agent_args):
-        #print("BS INIT")
         self.my_index = my_index
         self.num_players = num_players
         self.num_decks = agent_args["num_decks"]
         self.expected_values = None  # generated later when we are given our first hand
         self.in_pile = []
-        self.model = _Model(7, 1)
+        self.model = _Model(6, 1).to(device)
         self.data = []
         self.hand_sizes = [(52 * self.num_decks) // self.num_players] * self.num_players
         self.last_caller = None
-        self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.SGD(
+        self.criterion = nn.BCEWithLogitsLoss()
+        self.optimizer = optim.Adam(
             self.model.parameters(), lr=agent_args["learning_rate"]
         )
         self.train_every = agent_args["train_every"]
         self.turns = 0
-        self.training = True
-        if "training" in agent_args and agent_args["training"] is not None:
-            self.training = agent_args["training"]
         self.required_confidence = agent_args["required_confidence"]
-        if "load_model" in agent_args and agent_args["load_model"] is not None:
-            self.load_model(agent_args["load_model"])
+        if "load_model_bs" in agent_args and agent_args["load_model_bs"] is not None:
+            self.load_model(agent_args["load_model_bs"])
+        self.do_training = True
+        if "do_training_bs" in agent_args and agent_args["do_training_bs"] is not None:
+            self.do_training = agent_args["do_training_bs"]
 
     def gen_initial_expected_values(self, hand):
         self.expected_values = [
@@ -69,19 +75,19 @@ class BSCallLearningAgent(Agent):
 
     def train(self):
         #print("Training...")
-        if self.training is False:
+        if self.do_training is False:
             return
         outputs = self.model(
             tensor(
                 [self.data[i][1] for i in range(0, len(self.data), 2)], dtype=float32
-            )
+            ).to(device)
         ).reshape(-1)
         # print(tensor([self.data[i][1] for i in range(0, len(self.data), 2)],dtype=float32), outputs, tensor([self.data[i][1] for i in range(1, len(self.data), 2)]))
         loss = self.criterion(
             outputs,
             tensor(
                 [self.data[i][1] for i in range(1, len(self.data), 2)], dtype=float32
-            ),
+            ).to(device),
         )
         self.optimizer.zero_grad()
         loss.backward()
@@ -135,19 +141,23 @@ class BSCallLearningAgent(Agent):
             self.in_pile.append(card)
         self.update_expected_values(hand)
         d = (
-            [self.expected_values[player_index][card]] +
-            [sum(self.expected_values[(player_index + p) % 4][card] + card_amt for p in range(1, self.num_players))]
+            [self.expected_values[player_index][card]] 
             + [hand[card]]
             + [self.hand_sizes[(player_index - self.my_index) % 4]]
             + [card_amt]
             + [len(self.in_pile)]
             + [self.turns]
         )
-        if self.training:
+        if self.do_training:
             self.data.append(("data", d))
         self.hand_sizes[(player_index - self.my_index) % 4] -= card_amt
-        model_result = self.model.forward(tensor([d], dtype=float32))[0]
-        call = model_result.item() > self.required_confidence
+        model_result = self.model.forward(tensor([d], dtype=float32).to(device))[0]
+        val = sigmoid(model_result).item()
+        val = 2 * (1 / (1 + math.exp(-self.hand_sizes[(player_index - self.my_index) % 4]))) - 1
+        f = self.hand_sizes[0] - self.hand_sizes[(player_index - self.my_index) % 4] - len(self.in_pile)
+        f = max(min(f, -5),10)
+        val *= (self.required_confidence * 10) / (1.99 * f + 10)
+        call = model_result.item() > val
         # print(call)
         self.last_caller = player_index
         if hand[card] > 4 - card_amt:
@@ -161,13 +171,17 @@ class BSCallLearningAgent(Agent):
                     player_indexes_picked_up
                 )
 
+        num_cards = len(self.in_pile)
         for player in player_indexes_picked_up:
-            self.hand_sizes[(player - self.my_index) % 4] += len(self.in_pile) / 3
+            if num_cards % len(player_indexes_picked_up) > 0:
+                self.hand_sizes[(player - self.my_index) % 4] += 1
+                num_cards -= 1
+            self.hand_sizes[(player - self.my_index) % 4] += len(self.in_pile) // len(player_indexes_picked_up)
 
         self.in_pile = []
 
     def give_full_info(self, was_bs):
-        if self.training is False:
+        if self.do_training is False:
             return
         if len(self.data) > 0 and self.data[-1][0] == "label":
             return

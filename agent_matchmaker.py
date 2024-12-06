@@ -8,6 +8,9 @@ from agents.simple_agent import SimpleAgent
 from agents.smarter_simple_agent import SmartSimpleAgent
 from agents.aggressive_agent import AggressiveAgent
 from agents.ppo_agent import PPOAgent
+from agents.smart_simple_agent_bs_learner import SmartSimpleAgentBSLearner
+
+import torch
 
 from env import BSEnv
 
@@ -132,6 +135,19 @@ def matchmake(agent_types, num_agents_per_type = 9, num_iterations = 1000, match
         print(f"{agent_name} {' ' * (max_name_length - len(agent_name))} Elo: {elo:.2f}, Wins: {win}")
 
 
+bs_learner_args = {
+    "num_decks": 1,
+    "train_every": 3,
+    "required_confidence": 0.8,
+    "learning_rate": 0.01,
+    "do_training_bs": False,
+    "load_model_bs": torch.load("model_bs_trained.pt")
+}
+
+baa = {
+    "num_decks": 1
+}
+
 # example
 if __name__ == "__main__":
-    matchmake([SimpleAgent, SmartSimpleAgent, PPOAgent, RandomAgent],agent_args=[{}, {}, {}, {}])
+    matchmake([SimpleAgent, SmartSimpleAgent, SimpleAgent, RandomAgent, SmartSimpleAgentBSLearner],agent_args=[baa, baa, {"do_training": False}, {"random_chance": 0.1}, bs_learner_args])

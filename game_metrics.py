@@ -159,20 +159,24 @@ def plt_bs_called_accuracy_not_free(game_metrics, player_index, n=None):
 
 
 def plt_bs_call_rate(game_metrics, player_index, n=None):
+    if player_index in [0, 1, 2, 3]:
+        player_index = [player_index]
     if n is None:
         n = sum([len(game.rounds) for game in game_metrics]) // partition_size
+        n *= len(player_index)
     calls = deque()
     window_bs = 0
     window_not_bs = 0
     rate = []
     for game in game_metrics:
         for round in game.rounds:
-            if player_index in round.bs_calls:
-                calls.append(1)
-                window_bs += 1
-            else:
-                calls.append(0)
-                window_not_bs += 1
+            for p in player_index:
+                if p in round.bs_calls:
+                    calls.append(1)
+                    window_bs += 1
+                else:
+                    calls.append(0)
+                    window_not_bs += 1
             if len(calls) > n:
                 r = calls.popleft()
                 if r == 1:
@@ -217,20 +221,24 @@ def plt_true_bs_ratio(game_metrics, player_indexes=None, n=None):
 
 
 def plt_avg_delta_cards(game_metrics, player_index, n=None):
+    if player_index in [0, 1, 2, 3]:
+        player_index = [player_index]
     if n is None:
         n = sum([len(game.rounds) for game in game_metrics]) // partition_size
+        n *= len(player_index)
     calls = deque()
     window_delta = 0
     rate = []
     for game in game_metrics:
         for round in game.rounds:
-            if round.player_index == player_index:
+            if round.player_index in player_index:
+                pi = round.player_index
                 calls.append(
-                    sum(round.starting_hands[player_index].values())
-                    - sum(round.ending_hands[player_index].values())
+                    sum(round.starting_hands[pi].values())
+                    - sum(round.ending_hands[pi].values())  
                 )
-                window_delta += sum(round.starting_hands[player_index].values()) - sum(
-                    round.ending_hands[player_index].values()
+                window_delta += sum(round.starting_hands[pi].values()) - sum(
+                    round.ending_hands[pi].values()
                 )
             if len(calls) > n:
                 window_delta -= calls.popleft()
@@ -243,7 +251,8 @@ def plt_avg_delta_cards(game_metrics, player_index, n=None):
 
 def plt_win_rate(game_metrics, player_index, n=None):
     if n is None:
-        n = len(game_metrics) // partition_size * 2
+        n = len(game_metrics) // partition_size
+        n *= 4
     calls = deque()
     window_wins = 0
     rate = []

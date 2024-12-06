@@ -11,7 +11,7 @@ from torch.distributions import Categorical
 import numpy as np
 
 # set device to cpu or cuda
-device = torch.device('cpu')
+device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
 if(torch.cuda.is_available()):
     device = torch.device('cuda:0')
@@ -108,7 +108,7 @@ class ActorCritic(nn.Module):
             cov_mat = torch.diag(self.action_var).unsqueeze(dim=0)
             dist = MultivariateNormal(action_mean, cov_mat)
         else:
-            logits = self.actor(state)
+            logits = self.actor(state).to(device)
             if action_mask is not None:
                 # mask out invalid actions
                 logits = logits + (action_mask + 1e-45).log()
@@ -315,10 +315,12 @@ class PPO:
 class PPOAgent():
     AGENT_CARDS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
     """ BS Agent class implemented for the PPO algorithm. Can only handle 4 players and 1 deck atm."""
-    def __init__(self, my_index, num_players):
+    def __init__(self, my_index, num_players, agent_args = {}):
         self.my_index = my_index
         self.num_players = num_players
-
+        self.do_training = True
+        if "do_training" in agent_args and agent_args["do_training"] is not None:
+            self.do_training = agent_args["do_training"]
         # keep track of cards
         self.track_pile = {card : 0 for card in self.AGENT_CARDS}
         self.track_pile_list = []
@@ -528,7 +530,7 @@ class PPOAgent():
                     
         # pad the rest of mask since they are invalid
         action_mask+=[0]*(52-len(action_mask))
-        action_mask = torch.tensor(action_mask)
+        action_mask = torch.tensor(action_mask).to(device)
         action_index = self.card_playing_ppo_agent.select_action(state, action_mask)
         card_type, card_amt = action_index_map[action_index]
                 
@@ -543,8 +545,8 @@ class PPOAgent():
                 reward += 2
             else:
                 reward-=1
-                
-        self.update_model(self.card_playing_ppo_agent, reward, False, False)
+        if self.do_training:
+            self.update_model(self.card_playing_ppo_agent, reward, False, False)
         return action_index_map[action_index]
 
     def get_call_bs(self, player_index, card, card_amt, hand):
@@ -560,7 +562,7 @@ class PPOAgent():
         self.track_pile_list.extend(["unk"]*card_amt)
 
         state, reward = self.generate_state(hand,intended_card=card,card_amt=card_amt,player_to_bid_bs_on=player_index)
-        action_mask = torch.ones(2)
+        action_mask = torch.ones(2).to(device)
         action_index = self.bs_ppo_agent.select_action(state, action_mask, intended_card_index=-1)
         
         self.update_model(self.bs_ppo_agent, reward, False, True)
