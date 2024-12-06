@@ -159,7 +159,6 @@ class ActorCritic(nn.Module):
 
 class PPO:
     def __init__(self, state_dim, action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std_init=0.6):
-
         self.has_continuous_action_space = has_continuous_action_space
 
         if has_continuous_action_space:
@@ -312,6 +311,7 @@ class PPO:
         self.policy.load_state_dict(torch.load(checkpoint_path, map_location=lambda storage, loc: storage))
         
 
+
 class PPOAgent():
     AGENT_CARDS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
     """ BS Agent class implemented for the PPO algorithm. Can only handle 4 players and 1 deck atm."""
@@ -346,6 +346,9 @@ class PPOAgent():
         bs_action_dim = 2 # is_bs (0,1)
         self.bs_ppo_agent = PPO(self.bs_state_dim, bs_action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std)
         
+        self.card_playing_ppo_agent.load('agent_weights/30000_simple_agents_play_policy.pth')
+        self.bs_ppo_agent.load('agent_weights/30000_simple_agents_bs_policy.pth')
+
         self.state = None
         self.previous_hand_size = 0
         self.previous_hand_size_bs = 0
@@ -622,3 +625,7 @@ class PPOAgent():
 
         self.track_player_hands = [{card : 0 for card in self.AGENT_CARDS} for _ in range(self.num_players)]
         self.hand_sizes = [13] * self.num_players
+    
+    def give_winner(self, winner):
+        pass
+

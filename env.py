@@ -91,7 +91,7 @@ class BSEnv:
         self.reset()
         winner = None
         while not self.finished:
-            if self.total_turns > 400:
+            if self.total_turns > 400000:
                 print("Game Not Stopping")
                 self.finished = True
             starting_hands = deepcopy(self.player_hands)

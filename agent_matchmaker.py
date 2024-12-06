@@ -7,6 +7,8 @@ from agents.random_agent import RandomAgent
 from agents.simple_agent import SimpleAgent
 from agents.smarter_simple_agent import SmartSimpleAgent
 from agents.aggressive_agent import AggressiveAgent
+from agents.ppo_agent import PPOAgent
+
 from env import BSEnv
 
 # elo system based on the formula from Reiner Knizia’s Samurai game
@@ -116,7 +118,7 @@ class MatchMaker:
             groups = self.form_groups()
             self.run_matches(groups, matches=matches_per_group)
 
-def matchmake(agent_types, num_agents_per_type = 9, num_iterations = 500, matches_per_group = 3, agent_args = None, seed = None):
+def matchmake(agent_types, num_agents_per_type = 9, num_iterations = 1000, matches_per_group = 3, agent_args = None, seed = None):
     if seed is not None:
         random.seed(seed)
     matchmaker = MatchMaker(agent_types,num_agents_per_type = num_agents_per_type, agent_args=agent_args)
@@ -132,4 +134,4 @@ def matchmake(agent_types, num_agents_per_type = 9, num_iterations = 500, matche
 
 # example
 if __name__ == "__main__":
-    matchmake([SimpleAgent, SmartSimpleAgent, AggressiveAgent, RandomAgent],agent_args=[{}, {}, {}, {}])
+    matchmake([SimpleAgent, SmartSimpleAgent, PPOAgent, RandomAgent],agent_args=[{}, {}, {}, {}])
