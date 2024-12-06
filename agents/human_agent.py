@@ -31,7 +31,7 @@ class HumanAgent(Agent):
 
     def get_call_bs(self, player_index, card, card_amt, hand) -> bool:
         print()
-        print("Player: ", str(player_index) + "'s", "turn")
+        print("Player:", str(player_index) + "'s", "turn")
         print(player_index, "played", card_amt, card + "s")
         self.print_hand(hand)
         while True:

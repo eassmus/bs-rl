@@ -29,8 +29,8 @@ class TrainingBSEnv(env.BSEnv):
         self.reset()
         winner = None
         while not self.finished:
-            if self.total_turns > 400:
-                print("Game Not Stopping")
+            if self.total_turns > 800:
+                #print("Game Not Stopping")
                 self.finished = True
             starting_hands = deepcopy(self.player_hands)
             starting_pile = deepcopy(self.pile)

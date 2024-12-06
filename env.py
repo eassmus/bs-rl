@@ -31,13 +31,14 @@ def remove_cards(card_list, card, num):
 
 
 class BSEnv:
-    def __init__(self, agent_types: list[Agent], agent_args=[], decks=1):
+    def __init__(self, agent_types: list[Agent], agent_args=[], decks=1, print_callers = False):
         self.num_players = len(agent_types)
         self.agent_types = agent_types
         self.players = []
         self.decks = decks
         self.players = []
         self.starting_turn = 0
+        self.print_callers = print_callers
         for i, agent_type in enumerate(self.agent_types):
             # initialize players
             if len(agent_args) > 0 and len(agent_args[i]) > 0:
@@ -127,6 +128,12 @@ class BSEnv:
                     bids[player_index] = True
 
             if True in bids:
+                if self.print_callers:
+                    out = ""
+                    for i in range(self.num_players):
+                        if bids[i]:
+                            out += str(i) + " "
+                    print("Players:",out,"called bs")
                 if is_bs:
                     # add pile to player hand
                     while len(self.pile) > 0:

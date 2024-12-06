@@ -52,7 +52,7 @@ random_agent = (RandomAgent, {"random_chance": 0.1})
 smart_expected_value = (SmartExpectedValueAgent, baa)
 
 def play_game(agents):
-    env = BSEnv([HumanAgent] + [a[0] for a in agents], [baa] + [a[1] for a in agents])
+    env = BSEnv([HumanAgent] + [a[0] for a in agents], [baa] + [a[1] for a in agents],print_callers=True)
     print('\n' * 20)
     env.run_game()
 
