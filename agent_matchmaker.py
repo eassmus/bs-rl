@@ -9,6 +9,9 @@ from agents.smarter_simple_agent import SmartSimpleAgent
 from agents.aggressive_agent import AggressiveAgent
 from agents.ppo_agent import PPOAgent
 from agents.smart_simple_agent_bs_learner import SmartSimpleAgentBSLearner
+from agents.smart_expected_value_agent import SmartExpectedValueAgent
+from agents.ppo_agent_bs_learner import PPOAgentBSLearner
+from agents.dqn_agent import DQNAgent
 
 import torch
 
@@ -121,7 +124,7 @@ class MatchMaker:
             groups = self.form_groups()
             self.run_matches(groups, matches=matches_per_group)
 
-def matchmake(agent_types, num_agents_per_type = 9, num_iterations = 1000, matches_per_group = 3, agent_args = None, seed = None):
+def matchmake(agent_types, num_agents_per_type = 1, num_iterations = 1000, matches_per_group = 2, agent_args = None, seed = None):
     if seed is not None:
         random.seed(seed)
     matchmaker = MatchMaker(agent_types,num_agents_per_type = num_agents_per_type, agent_args=agent_args)
@@ -130,24 +133,49 @@ def matchmake(agent_types, num_agents_per_type = 9, num_iterations = 1000, match
     results = matchmaker.report_results()
 
     print(f"Elo Ratings and Total Wins (Sorted by Elo):")
-    max_name_length = max(len(agent_name) for agent_name, _, _ in results)
+    max_name_length = min(max(len(agent_name) for agent_name, _, _ in results),50)
     for agent_name, elo, win in results:
-        print(f"{agent_name} {' ' * (max_name_length - len(agent_name))} Elo: {elo:.2f}, Wins: {win}")
+        print(f"{agent_name[0: min(len(agent_name), max_name_length)]} {' ' * (max_name_length - min(len(agent_name), max_name_length))} Elo: {elo:.2f}, Wins: {win}")
 
 
 bs_learner_args = {
     "num_decks": 1,
     "train_every": 3,
-    "required_confidence": 0.8,
+    "required_confidence": 0.9,
     "learning_rate": 0.01,
     "do_training_bs": False,
-    "load_model_bs": torch.load("model_bs_trained.pt")
+    "load_model_bs": torch.load("model_bs_trained.pt"),
+    "do_fancy": False
 }
 
 baa = {
     "num_decks": 1
 }
 
+dqn_args = {
+    "num_decks": 1,
+    "load_model": torch.load("model550000.pt"),
+    "ep_decay": 500,
+    "training": False,
+    "batch_size": 64
+}
+
+dqn_args.update(bs_learner_args)
+
+ppo_bs_args = {"do_training": False}
+ppo_bs_args.update(bs_learner_args)
+
 # example
 if __name__ == "__main__":
-    matchmake([SimpleAgent, SmartSimpleAgent, SimpleAgent, RandomAgent, SmartSimpleAgentBSLearner],agent_args=[baa, baa, {"do_training": False}, {"random_chance": 0.1}, bs_learner_args])
+    matchmake([SimpleAgent, SmartSimpleAgent, RandomAgent, PPOAgent, SmartSimpleAgentBSLearner, SmartExpectedValueAgent, PPOAgentBSLearner, DQNAgent],agent_args=
+        [
+            baa, 
+            baa, 
+            {"random_chance" : 0.1}, 
+            {"do_training": False}, 
+            bs_learner_args,
+            {"num_decks": 1, "threshold": 0.5},
+            ppo_bs_args,
+            dqn_args,
+        ]
+    )

@@ -10,7 +10,6 @@ import math
 cards = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
 
 sigmoid = nn.Sigmoid()
 
@@ -45,18 +44,20 @@ class BSCallLearningAgent(Agent):
         self.data = []
         self.hand_sizes = [(52 * self.num_decks) // self.num_players] * self.num_players
         self.last_caller = None
-        self.criterion = nn.BCEWithLogitsLoss()
-        self.optimizer = optim.Adam(
-            self.model.parameters(), lr=agent_args["learning_rate"]
-        )
         self.train_every = agent_args["train_every"]
         self.turns = 0
+        self.do_fancy = agent_args["do_fancy"]
         self.required_confidence = agent_args["required_confidence"]
         if "load_model_bs" in agent_args and agent_args["load_model_bs"] is not None:
             self.load_model(agent_args["load_model_bs"])
         self.do_training = True
         if "do_training_bs" in agent_args and agent_args["do_training_bs"] is not None:
             self.do_training = agent_args["do_training_bs"]
+        if self.do_training:
+            self.criterion = nn.BCEWithLogitsLoss()
+            self.optimizer = optim.Adam(
+                self.model.parameters(), lr=agent_args["learning_rate"]
+            )
 
     def gen_initial_expected_values(self, hand):
         self.expected_values = [
@@ -152,14 +153,19 @@ class BSCallLearningAgent(Agent):
             self.data.append(("data", d))
         self.hand_sizes[(player_index - self.my_index) % 4] -= card_amt
         model_result = self.model.forward(tensor([d], dtype=float32).to(device))[0]
-        val = sigmoid(model_result).item()
-        val = 2 * (1 / (1 + math.exp(-self.hand_sizes[(player_index - self.my_index) % 4]))) - 1
-        f = self.hand_sizes[0] - self.hand_sizes[(player_index - self.my_index) % 4] - len(self.in_pile)
-        f = max(min(f, -5),10)
-        val *= (self.required_confidence * 10) / (1.99 * f + 10)
-        call = model_result.item() > val
+        if self.do_fancy:
+            val = sigmoid(model_result).item()
+            val = 2 * (1 / (1 + math.exp(-self.hand_sizes[(player_index - self.my_index) % 4]))) - 1
+            f = self.hand_sizes[0] - self.hand_sizes[(player_index - self.my_index) % 4] - len(self.in_pile)
+            f = max(min(f, -5),10)
+            val *= (self.required_confidence * 10) / (1.99 * f + 10)
+            call = model_result.item() > val
+        else:
+            call = model_result.item() > self.required_confidence
         # print(call)
         self.last_caller = player_index
+        if self.hand_sizes[(player_index - self.my_index) % 4] <= 0:
+            call = True
         if hand[card] > 4 - card_amt:
             call = True
         return call

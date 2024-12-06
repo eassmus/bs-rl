@@ -86,9 +86,11 @@ class DQNAgent(Agent):
         self.tau = 0.01
 
         self.bs_agent = BSCallLearningAgent(my_index, num_players, agent_args)
-
+        self.training = True
+        if "training" in agent_args and agent_args["training"] is not None:
+            self.training = agent_args["training"]
         if "load_models" in agent_args and agent_args["load_models"] is not None:
-            self.load_model(agent_args["load_models"][0], agent_args["load_models"][1])
+            self.load_model(agent_args["load_models"])
 
     def get_ep_threshhold(self):
         # print(self.ep_end + (self.ep_start - self.ep_end) * math.exp(-1. * self.training_cycles / self.ep_decay))
@@ -145,6 +147,8 @@ class DQNAgent(Agent):
         return cards[best_action[0]], best_action[1]
 
     def check_for_reward(self, hand_size, hand):
+        if not self.training:
+            return
         if self.last_hand_size == -1:
             return
         mod_mad = {
@@ -191,6 +195,8 @@ class DQNAgent(Agent):
             self.bs_agent.load_model(bs_model)
 
     def train(self):
+        if not self.training:
+            return
         if len(self.replay_buffer) < self.batch_size:
             return
         transitions = random.sample(self.replay_buffer, self.batch_size)
