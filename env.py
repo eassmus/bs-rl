@@ -4,7 +4,7 @@ import game_metrics as gm
 from collections import defaultdict
 from agents.agent import Agent
 
-random.seed(42)
+#random.seed(42)
 
 # Player Methods
 # get_call_bs
